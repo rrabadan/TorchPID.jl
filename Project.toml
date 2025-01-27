@@ -1,0 +1,4 @@
+name = "TorchPID"
+version = "0.1.0"
+description = "Torch PID reconstruction"
+authors = ["Raul Rabadan <raul.iraq.rabadan.trejo@cern.ch>"]
