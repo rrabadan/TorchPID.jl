@@ -1,29 +1,3 @@
-using UnROOT
-include("Particle.jl")
-
-function photon_columns(; debugPhotons::Bool=false)
-    columns = ["Run", "Event", "Module", "Track", "Energy", "ArrivalTime", "LocalX", "LocalY"]
-    if debugPhotons
-        debug_columns = ["EmissionTime", "CherenkovTheta", "CherenkovPhi", "EmissionX", "EmissionY", "EmissionZ",
-            "LocalTrackDirectionX", "LocalTrackDirectionY", "LocalTrackDirectionZ"]
-        push!(columns, debug_columns...)
-    end
-    return columns
-end
-
-function track_columns(; useTruth::Bool=false)
-    columns = ["Run", "Event", "Track", "True_ID", "True_PX", "True_PY", "True_PZ",
-        "Reco_Momentum", "True_Momentum", "Reco_PathLength", "True_PathLength"]
-    if useTruth
-        truth_columns = ["True_Module", "True_Local_DirX", "True_Local_DirY", "True_Local_DirZ"]
-        push!(columns, truth_columns...)
-    else
-        reco_columns = ["Reco_Module", "Reco_Local_DirX", "Reco_Local_DirY", "Reco_Local_DirZ"]
-        push!(columns, reco_columns...)
-    end
-    return columns
-end
-
 struct EventReader
     events::LazyTree
     tracks::LazyTree
@@ -35,10 +9,13 @@ struct EventReader
     #Inner constructor
     function EventReader(file::String; useTruth::Bool=false, debugPhotons::Bool=false)
         f = ROOTFile(file)
-        new(LazyTree(f, "TorchTuple/TorchEvent"),
+        new(
+            LazyTree(f, "TorchTuple/TorchEvent"),
             LazyTree(f, "TorchTuple/TorchTracks"),
             LazyTree(f, "TorchTuple/TorchHits"),
-            useTruth, debugPhotons)
+            useTruth,
+            debugPhotons,
+        )
     end
 end
 
@@ -60,7 +37,69 @@ function get_particle(reader::EventReader, entry::UnROOT.LazyEvent)::Particle
     recoPZ::Float64 = reader.useTruth ? 0.0 : entry.Reco_PZ
     truePathlength::Float64 = entry.True_PathLength
     recoPathlength::Float64 = reader.useTruth ? 0.0 : entry.Reco_Pathlength
-    Particle(pid=pid, eventId=eventId, trackId=trackId, moduleId=moduleId, pMag=pMag, pMagTrue=pMagTrue,
-        xDir=xDir, yDir=yDir, zDir=zDir, truePX=truePX, truePY=truePY, truePZ=truePZ,
-        recoPX=recoPX, recoPY=recoPY, recoPZ=recoPZ, recoPathlength=recoPathlength, truePathlength=truePathlength)
+    Particle(
+        pid=pid,
+        eventId=eventId,
+        trackId=trackId,
+        moduleId=moduleId,
+        pMag=pMag,
+        pMagTrue=pMagTrue,
+        xDir=xDir,
+        yDir=yDir,
+        zDir=zDir,
+        truePX=truePX,
+        truePY=truePY,
+        truePZ=truePZ,
+        recoPX=recoPX,
+        recoPY=recoPY,
+        recoPZ=recoPZ,
+        recoPathlength=recoPathlength,
+        truePathlength=truePathlength,
+    )
+end
+
+function photon_columns(; debugPhotons::Bool=false)
+    columns =
+        ["Run", "Event", "Module", "Track", "Energy", "ArrivalTime", "LocalX", "LocalY"]
+    if debugPhotons
+        debug_columns = [
+            "EmissionTime",
+            "CherenkovTheta",
+            "CherenkovPhi",
+            "EmissionX",
+            "EmissionY",
+            "EmissionZ",
+            "LocalTrackDirectionX",
+            "LocalTrackDirectionY",
+            "LocalTrackDirectionZ",
+        ]
+        push!(columns, debug_columns...)
+    end
+    return columns
+end
+
+function track_columns(; useTruth::Bool=false)
+    columns = [
+        "Run",
+        "Event",
+        "Track",
+        "True_ID",
+        "True_PX",
+        "True_PY",
+        "True_PZ",
+        "Reco_Momentum",
+        "True_Momentum",
+        "Reco_PathLength",
+        "True_PathLength",
+    ]
+    if useTruth
+        truth_columns =
+            ["True_Module", "True_Local_DirX", "True_Local_DirY", "True_Local_DirZ"]
+        push!(columns, truth_columns...)
+    else
+        reco_columns =
+            ["Reco_Module", "Reco_Local_DirX", "Reco_Local_DirY", "Reco_Local_DirZ"]
+        push!(columns, reco_columns...)
+    end
+    return columns
 end
