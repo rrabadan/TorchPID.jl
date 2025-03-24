@@ -95,6 +95,14 @@ function initRotation(p::Particle)
     end
 end
 
+function rotate(p::Particle, x::Float64, y::Float64, z::Float64)::Tuple{Float64,Float64,Float64}
+    return (
+        p.rotMatrix[1, 1] * x + p.rotMatrix[1, 2] * y + p.rotMatrix[1, 3] * z,
+        p.rotMatrix[2, 1] * x + p.rotMatrix[2, 2] * y + p.rotMatrix[2, 3] * z,
+        p.rotMatrix[3, 1] * x + p.rotMatrix[3, 2] * y + p.rotMatrix[3, 3] * z,
+    )
+end
+
 @enum ParticleType begin
     UNKNOWN
     PION
