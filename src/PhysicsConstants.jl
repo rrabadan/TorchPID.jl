@@ -6,4 +6,6 @@ const PROTON_MASS = 0.938272 # GeV/c^2
 const ELECTRON_MASS = 0.000511 # GeV/c^2
 const MUON_MASS = 0.105658 # GeV/c^2
 
+const LAMBDA = 1239.84193 # energy to wavelength conversion factor, nm * eV
+
 const N_AIR = 1.00029 # Refractive index of air
