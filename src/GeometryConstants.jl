@@ -173,11 +173,22 @@ function Detector(
     )
 end
 
+struct Mask
+    y_min::Float64
+    y_max::Float64
+end
+
+function Mask(y_min::Float64 = -999.0, y_max::Float64 = -999.0)
+    Mask(y_min, y_max)
+end
+
 # Create instances of the structs and export them
 RADIATOR = Radiator(height = 2500.0, width = 660.0, depth = 10.0)
 WEDGE = Wedge(RADIATOR)
 FOCUS = Focus(RADIATOR, WEDGE)
 DETECTOR = Detector(RADIATOR, WEDGE)
+MASK = Mask()
+
 
 function photonFromFocus(yemission)
     radiator_top = 0.5 * RADIATOR.height - WEDGE.height
