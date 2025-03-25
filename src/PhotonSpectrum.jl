@@ -1,3 +1,8 @@
+""" 
+    PhotonSpectrum
+
+A structure representing the photon spectrum parameters and arrays.
+"""
 struct PhotonSpectrum
     nbins::Int
     emin::Float64
@@ -12,9 +17,17 @@ struct PhotonSpectrum
     nphase_edge::Vector{Float64}
 end
 
-function PhotonSpectrum(; nbins::Int=525, emin::Float64=1.75, emax::Float64=7.00)
+""" 
+    PhotonSpectrum(dht::DetectorHitTester; nbins, emin, emax)
 
-    dht = DetectorHitTester(emin=emin, emax=emax)
+Construct a PhotonSpectrum from a DetectorHitTester using specified energy bin parameters.
+"""
+function PhotonSpectrum(
+    dht::DetectorHitTester;
+    nbins::Int = 525,
+    emin::Float64 = 1.75,
+    emax::Float64 = 7.00,
+)
 
     dE = (emax - emin) / nbins
     energy = Vector{Float64}(undef, nbins)
@@ -47,10 +60,25 @@ function PhotonSpectrum(; nbins::Int=525, emin::Float64=1.75, emax::Float64=7.00
         nphase,
         ngroup,
         vgroup,
-        nphase_edge
+        nphase_edge,
     )
 end
 
+""" 
+    PhotonSpectrum(; nbins, emin, emax)
+
+Construct a PhotonSpectrum using a default DetectorHitTester with specified energy parameters.
+"""
+function PhotonSpectrum(; nbins::Int = 525, emin::Float64 = 1.75, emax::Float64 = 7.00)
+    dht = DetectorHitTester(emin = emin, emax = emax)
+    PhotonSpectrum(dht, nbins = nbins, emin = emin, emax = emax)
+end
+
+""" 
+    PhotonSpectrumDistribution
+
+A structure representing the photon spectrum distribution details.
+"""
 struct PhotonSpectrumDistribution
     beta::Float64
     yield_per_mm::Float64
@@ -58,15 +86,24 @@ struct PhotonSpectrumDistribution
     cumulative::Vector{Float64}
 end
 
+""" 
+    PhotonSpectrumDistribution(s::PhotonSpectrum, beta::Float64)
+
+Generate a photon spectrum distribution from a PhotonSpectrum using associated particle's beta parameter.
+"""
 function PhotonSpectrumDistribution(s::PhotonSpectrum, beta::Float64)
     #distribution = Vector{Float64}(undef, s.nbins)
     cumulative = Vector{Float64}(undef, s.nbins)
 
-    distribution = map((v1, v2) -> begin
+    distribution = map(
+        (v1, v2) -> begin
             bn = beta * v1
             sinsqthetac = bn > 1.0 ? 1.0 - (1.0 / bn)^2 : 0.0
             37.0 * s.dE * sinsqthetac * v2
-        end, s.nphase, s.efficiency)
+        end,
+        s.nphase,
+        s.efficiency,
+    )
 
     cumsum!(cumulative, distribution)
 
@@ -74,24 +111,43 @@ function PhotonSpectrumDistribution(s::PhotonSpectrum, beta::Float64)
     cumulative ./= yield_per_mm
 
     PhotonSpectrumDistribution(beta, yield_per_mm, distribution, cumulative)
-
 end
 
-function nphase(s::PhotonSpectrum, energy::Float64)::Float64
+""" 
+    spectrum_nphase(s::PhotonSpectrum, energy::Float64)::Float64
+
+Return the nphase value corresponding to the given energy in the photon spectrum.
+"""
+function spectrum_nphase(s::PhotonSpectrum, energy::Float64)::Float64
     n = floor(Int, (energy - s.emin) / s.dE) + 1
     return (n ≥ 1 && n ≤ s.nbins) ? s.nphase[n] : 0.0
 end
 
-function ngroup(s::PhotonSpectrum, energy::Float64)::Float64
+""" 
+    spectrum_ngroup(s::PhotonSpectrum, energy::Float64)::Float64
+
+Return the ngroup value corresponding to the given energy in the photon spectrum.
+"""
+function spectrum_ngroup(s::PhotonSpectrum, energy::Float64)::Float64
     n = floor(Int, (energy - s.emin) / s.dE) + 1
     return (n ≥ 1 && n ≤ s.nbins) ? s.ngroup[n] : 0.0
 end
 
-function get_yield(d::PhotonSpectrumDistribution, pathlength::Float64)::Float64
+""" 
+    spectrum_yield(d::PhotonSpectrumDistribution, pathlength::Float64)::Float64
+
+Calculate the total yield over the specified pathlength.
+"""
+function spectrum_yield(d::PhotonSpectrumDistribution, pathlength::Float64)::Float64
     return pathlength * d.yield_per_mm
 end
 
-function get_random(s::PhotonSpectrum, d::PhotonSpectrumDistribution)::Float64
+""" 
+    spectrum_random_energy(s::PhotonSpectrum, d::PhotonSpectrumDistribution)::Float64
+
+Generate a random energy value sampled from the photon spectrum distribution.
+"""
+function spectrum_random_energy(s::PhotonSpectrum, d::PhotonSpectrumDistribution)::Float64
     if d.yield_per_mm == 0.0
         return 0.0
     end
@@ -105,7 +161,16 @@ function get_random(s::PhotonSpectrum, d::PhotonSpectrumDistribution)::Float64
     end
 end
 
-function get_probability(s::PhotonSpectrum, d::PhotonSpectrumDistribution, energy::Float64)::Float64
+""" 
+    spectrum_probability(s::PhotonSpectrum, d::PhotonSpectrumDistribution, energy::Float64)::Float64
+
+Return the probability density for a given energy based on the spectrum distribution.
+"""
+function spectrum_probability(
+    s::PhotonSpectrum,
+    d::PhotonSpectrumDistribution,
+    energy::Float64,
+)::Float64
     n = floor(Int, (energy - s.emin) / s.dE) + 1
     return (n ≥ 1 && n ≤ s.nbins) ? d.distribution[n] / d.yield_per_mm : 0.0
 end

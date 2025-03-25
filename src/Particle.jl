@@ -1,3 +1,4 @@
+""" Represents a particle with kinematic and identification fields. """
 struct Particle
     pid::Int
     eventId::Int
@@ -22,29 +23,31 @@ struct Particle
     rotMatrix::Array{Float64,2}
 end
 
-# Outer constructor with default values
+""" Outer constructor for Particle with default parameters.
+    Returns a new Particle initialized with specified or default values.
+"""
 function Particle(;
-    pid::Int=211,
-    eventId::Int=0,
-    trackId::Int=0,
-    moduleId::Int=0,
-    xCoord::Float64=0.0,
-    yCoord::Float64=0.0,
-    pMag::Float64=0.0,
-    pMagTrue::Float64=0.0,
-    xDir::Float64=0.0,
-    yDir::Float64=0.0,
-    zDir::Float64=0.0,
-    truePX::Float64=0.0,
-    truePY::Float64=0.0,
-    truePZ::Float64=0.0,
-    recoPX::Float64=0.0,
-    recoPY::Float64=0.0,
-    recoPZ::Float64=0.0,
-    recoPathlength::Float64=0.0,
-    truePathlength::Float64=0.0,
-    t0::Float64=0.0,
-    rotMatrix::Array{Float64,2}=Array{Float64,2}([1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0]),
+    pid::Int = 211,
+    eventId::Int = 0,
+    trackId::Int = 0,
+    moduleId::Int = 0,
+    xCoord::Float64 = 0.0,
+    yCoord::Float64 = 0.0,
+    pMag::Float64 = 0.0,
+    pMagTrue::Float64 = 0.0,
+    xDir::Float64 = 0.0,
+    yDir::Float64 = 0.0,
+    zDir::Float64 = 0.0,
+    truePX::Float64 = 0.0,
+    truePY::Float64 = 0.0,
+    truePZ::Float64 = 0.0,
+    recoPX::Float64 = 0.0,
+    recoPY::Float64 = 0.0,
+    recoPZ::Float64 = 0.0,
+    recoPathlength::Float64 = 0.0,
+    truePathlength::Float64 = 0.0,
+    t0::Float64 = 0.0,
+    rotMatrix::Array{Float64,2} = Array{Float64,2}([1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0]),
 )
     Particle(
         pid,
@@ -71,14 +74,23 @@ function Particle(;
     )
 end
 
+""" Calculates the beta factor for the particle.
+    beta = pMag / √(pMag² + m²)
+"""
 function beta(p::Particle, m::Float64)::Float64
     return p.pMag / sqrt(p.pMag^2 + m^2)
 end
 
+""" Calculates the gamma factor for the particle.
+    gamma = 1 / √(1 - beta²)
+"""
 function gamma(p::Particle, m::Float64)::Float64
     return 1 / sqrt(1 - beta(p, m)^2)
 end
 
+""" Initializes the rotation matrix of the particle based on its direction components.
+    Updates the rotMatrix field in-place.
+"""
 function initRotation(p::Particle)
     uperp::Float64 = sqrt(p.xDir^2 + p.yDir^2)
 
@@ -95,7 +107,15 @@ function initRotation(p::Particle)
     end
 end
 
-function rotate(p::Particle, x::Float64, y::Float64, z::Float64)::Tuple{Float64,Float64,Float64}
+""" Rotates a 3D vector (x, y, z) using the particle's rotation matrix.
+    Returns the rotated (x, y, z) tuple.
+"""
+function rotate(
+    p::Particle,
+    x::Float64,
+    y::Float64,
+    z::Float64,
+)::Tuple{Float64,Float64,Float64}
     return (
         p.rotMatrix[1, 1] * x + p.rotMatrix[1, 2] * y + p.rotMatrix[1, 3] * z,
         p.rotMatrix[2, 1] * x + p.rotMatrix[2, 2] * y + p.rotMatrix[2, 3] * z,
@@ -126,6 +146,9 @@ const PARTICLE_PROPERTIES = Dict(
     PROTON => ParticleProperty("proton", PROTON_MASS, 2212),
 )
 
+""" Returns the particle type and its properties based on the particle's pid.
+    Iterates through PARTICLE_PROPERTIES to match the absolute pid value.
+"""
 function get_type_and_properties(p::Particle)
     for (k, v) in PARTICLE_PROPERTIES
         if v.pdgid == abs(p.pid)
@@ -135,6 +158,9 @@ function get_type_and_properties(p::Particle)
     return UNKNOWN, ParticleProperties(0.0, 0)
 end
 
+""" Looks up and returns the mass of a particle given its pid.
+    Returns 0.0 if the pid is not found.
+"""
 function get_particle_mass(pid::Int64)::Float64
     for (k, v) in PARTICLE_PROPERTIES
         if v.pdgid == abs(pid)
