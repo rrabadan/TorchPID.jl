@@ -40,7 +40,7 @@ Compute the photon direction in the lab frame.
 # Returns
 Tuple{Float64,Float64,Float64,Float64} representing (xdir, ydir, zdir, slope).
 """
-function photon_direction(
+function _photon_direction(
     p::Particle,
     costhetac::Float64,
     sinthetac::Float64,
@@ -66,7 +66,7 @@ Calculate the photon emission coordinates at a specified z depth.
 # Returns
 Tuple{Float64,Float64,Float64} representing (xpos, ypos, zpos).
 """
-function photon_emission(p::Particle, zemission::Float64)::Tuple{Float64,Float64,Float64}
+function _photon_emission(p::Particle, zemission::Float64)::Tuple{Float64,Float64,Float64}
     xpos = p.xCoord + zemission * p.xDir / p.zDir
     ypos = p.yCoord + zemission * p.yDir / p.zDir
     return xpos, ypos, zemission
@@ -79,10 +79,10 @@ Calculate the photon emission coordinates using the default radiator depth.
 # Returns
 Tuple{Float64,Float64,Float64} representing (xpos, ypos, zpos).
 """
-function photon_emission(p::Particle)::Tuple{Float64,Float64,Float64}
+function _photon_emission(p::Particle)::Tuple{Float64,Float64,Float64}
     # emission point in z
     zemission = RADIATOR.depth * 0.5
-    return photon_emission(p, zemission)
+    return _photon_emission(p, zemission)
 end
 
 """ 
@@ -111,10 +111,10 @@ function Photon(
     sinthetac = sqrt(1.0 - costhetac^2)
 
     # photon direction
-    xdir, ydir, zdir, slope = photon_direction(p, costhetac, sinthetac, phi)
+    xdir, ydir, zdir, slope = _photon_direction(p, costhetac, sinthetac, phi)
 
     # emission point in z
-    xpos, ypos, zpos = photon_emission(p, RADIATOR.depth * rand())
+    xpos, ypos, zpos = _photon_emission(p, RADIATOR.depth * rand())
 
     # critical angle
     sinsqthetacrit = (N_AIR / nphase)^2
@@ -153,7 +153,7 @@ Test the photon surface roughness in the z-direction.
 # Returns
 Bool indicating whether the photon passes the roughness condition.
 """
-function photon_test_z_surface_roughness(photon::Photon, nreflec::Int)::Bool
+function test_z_surface_roughness(photon::Photon, nreflec::Int)::Bool
     c = π * photon.np * ROUGHNESS / photon.lambda
     r = exp(-c * c)
     return rand() < r^nreflec

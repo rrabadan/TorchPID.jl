@@ -76,7 +76,7 @@ function trace_to_top_of_plate(
 
     # number of reflections in zDir
     nz = Int(floor(zdistance / RADIATOR.depth))
-    if mapper.surface_roughness && !photon_test_z_surface_roughness(photon, nz)
+    if mapper.surface_roughness && !test_z_surface_roughness(photon, nz)
         return nothing
     end
 

@@ -13,7 +13,7 @@ export spectrum_nphase, spectrum_ngroup
 export spectrum_yield, spectrum_random_energy, spectrum_probability
 export Particle, beta, gamma, initRotation, rotate, get_particle_mass
 export PARTICLE_PROPERTIES
-export Photon, photon_test_z_surface_roughness, in_focus_acceptance
+export Photon, test_z_surface_roughness, in_focus_acceptance
 export PhotonMapper, trace_photon
 export TestBeamSimulator, TestBeamData, generate_particle
 # export EventReader, get_particle, photon_columns, track_columns
