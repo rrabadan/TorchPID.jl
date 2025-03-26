@@ -174,3 +174,18 @@ function spectrum_probability(
     n = floor(Int, (energy - s.emin) / s.dE) + 1
     return (n ≥ 1 && n ≤ s.nbins) ? d.distribution[n] / d.yield_per_mm : 0.0
 end
+
+"""
+    spectrum_above_threshold(d::PhotonSpectrumDistribution) -> Bool
+
+Check if the photon spectrum distribution has a yield per millimeter greater than zero.
+
+# Arguments
+- `d::PhotonSpectrumDistribution`: The photon spectrum distribution to check.
+
+# Returns
+- `Bool`: `true` if the yield per millimeter is greater than zero, `false` otherwise.
+"""
+function spectrum_above_threshold(d::PhotonSpectrumDistribution)::Bool
+    return d.yield_per_mm > 0.0
+end
