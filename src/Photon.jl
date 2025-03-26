@@ -85,22 +85,6 @@ function photon_emission(p::Particle)::Tuple{Float64,Float64,Float64}
     return photon_emission(p, zemission)
 end
 
-"""
-Test the photon surface roughness in the z-direction.
-
-# Arguments
-- photon::Photon: The Photon instance.
-- nreflec::Int: The number of reflections.
-
-# Returns
-Bool indicating whether the photon passes the roughness condition.
-"""
-function photon_test_z_surface_roughness(photon::Photon, nreflec::Int)::Bool
-    c = π * photon.np * ROUGHNESS / photon.lambda
-    r = exp(-c * c)
-    return rand() < r^nreflec
-end
-
 """ 
 Generate a Photon instance with computed direction, emission, and reflection flags.
 # Arguments
@@ -157,4 +141,35 @@ function Photon(
         is_y_reflected,
         is_z_reflected,
     )
+end
+
+"""
+Test the photon surface roughness in the z-direction.
+
+# Arguments
+- photon::Photon: The Photon instance.
+- nreflec::Int: The number of reflections.
+
+# Returns
+Bool indicating whether the photon passes the roughness condition.
+"""
+function photon_test_z_surface_roughness(photon::Photon, nreflec::Int)::Bool
+    c = π * photon.np * ROUGHNESS / photon.lambda
+    r = exp(-c * c)
+    return rand() < r^nreflec
+end
+
+""" 
+Checks whether the photon is within the focus acceptance region.
+Arguments:
+- photon::Photon: The photon instance.
+Returns:
+- Bool: true if within acceptance, false otherwise.
+"""
+function in_focus_acceptance(photon::Photon)::Bool
+    # Check if the photon is within the acceptance region
+    if (photon.slope < FOCUS.tan_theta_min) || (photon.slope > FOCUS.tan_theta_max)
+        return false
+    end
+    return true
 end

@@ -265,21 +265,6 @@ function project_x_detector_position(
 end
 
 """ 
-Checks whether the photon is within the focus acceptance region.
-Arguments:
-- photon::Photon: The photon instance.
-Returns:
-- Bool: true if within acceptance, false otherwise.
-"""
-function in_focus_acceptance(photon::Photon)::Bool
-    # Check if the photon is within the acceptance region
-    if (photon.slope < FOCUS.tan_theta_min) || (photon.slope > FOCUS.tan_theta_max)
-        return false
-    end
-    return true
-end
-
-""" 
 Traces the photon through the entire optical system from emission to detection.
 Arguments:
 - mapper::PhotonMapper: The photon mapping configuration.
