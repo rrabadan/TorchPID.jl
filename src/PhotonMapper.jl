@@ -42,6 +42,73 @@ function PhotonMapper(;
 end
 
 """ 
+Traces the photon through the entire optical system from emission to detection.
+Arguments:
+- mapper::PhotonMapper: The photon mapping configuration.
+- photon::Photon: The photon to trace.
+- t0::Float64: The production time of the photon.
+Returns:
+- HitCoordinate: The detected hit coordinate if the photon is successfully traced.
+- Nothing: if any tracing step fails.
+"""
+function trace_photon(
+    mapper::PhotonMapper,
+    photon::Photon,
+    t0::Float64,
+)::Union{HitCoordinate,Nothing}
+
+    # check if photon reflects in z
+    if !photon.is_z_reflected || abs(photon.ydir) < 1e-5
+        return nothing
+    end
+
+    if in_focus_acceptance(photon)
+        return nothing
+    end
+
+    tot_pathlength = 0.0
+
+    # trace to top of the plate
+    result = _trace_to_top_of_plate(mapper, photon)
+    if isnothing(result)
+        return nothing
+    end
+
+    zp, typ, tzp, pathlength = result
+    tot_pathlength += pathlength
+
+    # trace to the focus block
+    result = _trace_to_focus(zp, typ, tzp)
+    if isnothing(result)
+        return nothing
+    end
+
+    yf, tyf, tzf, pathlength = result
+    tot_pathlength += pathlength
+
+    # trace to the detector
+    result = _trace_to_detector(yf, tyf, tzf)
+    if isnothing(result)
+        return nothing
+    end
+
+    ydetected, pathlength = result
+    tot_pathlength += pathlength
+
+    # project x-detector position
+    xdetected = _project_x_detector_position(mapper, photon, tot_pathlength)
+    if isnothing(xdetected)
+        return nothing
+    end
+
+    # detected time is production time + time of propagation
+    tdetected = t0 + (pathlength * photon.ng / CLIGHT)
+
+    HitCoordinate(xdetected, ydetected, tdetected)
+
+end
+
+""" 
 Propagates the photon to the top of the plate.
 Arguments:
 - mapper::PhotonMapper: The mapping configuration.
@@ -54,7 +121,7 @@ Returns:
     pathlength -- accumulated pathlength
 - Nothing: if the photon's path is terminated.
 """
-function trace_to_top_of_plate(
+function _trace_to_top_of_plate(
     mapper::PhotonMapper,
     photon::Photon,
 )::Union{Tuple{Float64,Float64,Float64,Float64},Nothing}
@@ -112,7 +179,7 @@ Returns:
     pathlength -- accumulated pathlength
 - Nothing: if the photon's path is terminated.
 """
-function trace_to_focus(
+function _trace_to_focus(
     zp::Float64,
     typ::Float64,
     tzp::Float64,
@@ -133,7 +200,7 @@ function trace_to_focus(
 
     # Rotate the photon to the focus block
     tyf = abs(tzp) * FOCUS.cos_theta - typ * FOCUS.sin_theta
-    tzf = abs(tzp) * FOCUS.sin_theta + tYp * FOCUS.cos_theta
+    tzf = abs(tzp) * FOCUS.sin_theta + typ * FOCUS.cos_theta
 
     return yf, tyf, tzf, pathlength
 end
@@ -150,7 +217,7 @@ Returns:
     pathlength -- accumulated pathlength
 - Nothing: if the photon's path is terminated.
 """
-function trace_to_detector(
+function _trace_to_detector(
     yf::Float64,
     tyf::Float64,
     tzf::Float64,
@@ -231,13 +298,13 @@ Arguments:
 Returns:
 - Float64: The projected x position or nothing if conditions are not met.
 """
-function project_x_detector_position(
+function _project_x_detector_position(
     mapper::PhotonMapper,
     photon::Photon,
     pathlength::Float64,
 )::Union{Float64,Nothing}
     # Compute distance travelled in x
-    xdetected = p.xpos + pathlength * p.xdir
+    xdetected = photon.xpos + pathlength * photon.xdir
 
     # Counter for reflections in x
     nx = 0
@@ -246,9 +313,7 @@ function project_x_detector_position(
     while abs(xdetected) > RADIATOR.half_width
         # If blackening is enabled, the photon does not reflect further,
         # or photon was not reflected in x, or we already exceeded max allowed reflections:
-        if mapper.blackened_sides ||
-           !photon.is_reflected_x ||
-           (nx > mapper.max_x_reflections)
+        if mapper.blackened_sides || !photon.is_x_reflected || nx > mapper.max_x_reflections
             return nothing
         end
 
@@ -262,67 +327,4 @@ function project_x_detector_position(
         nx += 1
     end
     return xdetected
-end
-
-""" 
-Traces the photon through the entire optical system from emission to detection.
-Arguments:
-- mapper::PhotonMapper: The photon mapping configuration.
-- photon::Photon: The photon to trace.
-- t0::Float64: The production time of the photon.
-Returns:
-- HitCoordinate: The detected hit coordinate if the photon is successfully traced.
-- Nothing: if any tracing step fails.
-"""
-function trace_photon(
-    mapper::PhotonMapper,
-    photon::Photon,
-    t0::Float64,
-)::Union{HitCoordinate,Nothing}
-
-    # check if photon reflects in z
-    if photon.is_z_reflected || abs(photon.ydir) < 1e-5
-        return nothing
-    end
-
-    tot_pathlength = 0.0
-
-    # trace to top of the plate
-    result = trace_to_top_of_plate(mapper, photon)
-    if result === nothing
-        return nothing
-    end
-
-    zp, typ, tzp, pathlength = result
-    tot_pathlength += pathlength
-
-    # trace to the focus block
-    result = trace_to_focus(zp, typ, tzp)
-    if result === nothing
-        return nothing
-    end
-
-    yf, tyf, tzf, pathlength = result
-    tot_pathlength += pathlength
-
-    # trace to the detector
-    result = trace_to_detector(yf, tyf, tzf)
-    if result === nothing
-        return nothing
-    end
-
-    ydetected, pathlength = result
-    tot_pathlength += pathlength
-
-    # project x-detector position
-    xdetected = project_x_detector_position(mapper, photon, tot_pathlength)
-    if xdetected === nothing
-        return nothing
-    end
-
-    # detected time is production time + time of propagation
-    tdetected = t0 + (pathlength * photon.ng / CLIGHT)
-
-    HitCoordinate(xdetected, ydetected, tdetected)
-
 end
