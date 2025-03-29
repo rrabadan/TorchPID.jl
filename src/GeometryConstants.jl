@@ -178,7 +178,7 @@ struct Mask
     y_max::Float64
 end
 
-function Mask(y_min::Float64 = -999.0, y_max::Float64 = -999.0)
+function Mask(; y_min::Float64 = -999.0, y_max::Float64 = -999.0)
     Mask(y_min, y_max)
 end
 

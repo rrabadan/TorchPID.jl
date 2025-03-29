@@ -75,7 +75,7 @@ function efficiency(
     energy::Float64;
     glueLayers::Int = 1,
 )::Float64
-    if energy < dht.emin || energy > dht.emax
+    if energy < hitTester.emin || energy > hitTester.emax
         return 0.0
     end
     result = 1.0
