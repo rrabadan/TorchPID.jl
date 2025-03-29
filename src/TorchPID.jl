@@ -14,8 +14,9 @@ export spectrum_yield, spectrum_random_energy, spectrum_probability
 export Particle, beta, gamma, initRotation, rotate, get_particle_mass
 export PARTICLE_PROPERTIES
 export Photon, test_z_surface_roughness, in_focus_acceptance
+export project_pattern
 export PhotonMapper, trace_photon
-export TestBeamSimulator, TestBeamData, generate_particle
+export TestBeamSimulator, TestBeamData, generate_particle, generate_photons
 # export EventReader, get_particle, photon_columns, track_columns
 # export PIDAlgorithm, findHitCoordinates, runAlgorithm
 
@@ -28,8 +29,8 @@ include("PhotonSpectrum.jl")
 include("Particle.jl")
 include("Photon.jl")
 include("PhotonMapper.jl")
-#include("PatternMatcher.jl")
-#include("TestBeam.jl")
+include("PatternMatcher.jl")
+include("TestBeam.jl")
 #include("EventReader.jl")
 #include("PIDAlgorithm.jl")
 
