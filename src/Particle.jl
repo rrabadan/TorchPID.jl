@@ -17,7 +17,7 @@ struct Particle
     recoPX::Float64
     recoPY::Float64
     recoPZ::Float64
-    recoPathlength::Float64
+    pathlength::Float64
     truePathlength::Float64
     t0::Float64
     rotMatrix::Array{Float64,2}
@@ -44,7 +44,7 @@ function Particle(;
     recoPX::Float64 = 0.0,
     recoPY::Float64 = 0.0,
     recoPZ::Float64 = 0.0,
-    recoPathlength::Float64 = 0.0,
+    pathlength::Float64 = 0.0,
     truePathlength::Float64 = 0.0,
     t0::Float64 = 0.0,
     rotMatrix::Array{Float64,2} = Array{Float64,2}([1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0]),
@@ -67,7 +67,7 @@ function Particle(;
         recoPX,
         recoPY,
         recoPZ,
-        recoPathlength,
+        pathlength,
         truePathlength,
         t0,
         rotMatrix,
