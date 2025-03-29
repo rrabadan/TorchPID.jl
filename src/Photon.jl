@@ -44,16 +44,16 @@ function _photon_direction(
     p::Particle,
     costhetac::Float64,
     sinthetac::Float64,
-    phi::Float64,
+    phic::Float64,
 )::Tuple{Float64,Float64,Float64,Float64}
     # photon direction
-    xprime = sinthetac * cos(phi)
-    yprime = sinthetac * sin(phi)
+    xprime = sinthetac * cos(phic)
+    yprime = sinthetac * sin(phic)
     zprime = costhetac
 
     # rotate to the lab frame
     xdir, ydir, zdir = rotate(p, xprime, yprime, zprime)
-    slope = abs(xdir / zdir)
+    slope = abs(zdir / xdir)
 
     return xdir, ydir, zdir, slope
 end
@@ -69,6 +69,7 @@ Tuple{Float64,Float64,Float64} representing (xpos, ypos, zpos).
 function _photon_emission(p::Particle, zemission::Float64)::Tuple{Float64,Float64,Float64}
     xpos = p.xCoord + zemission * p.xDir / p.zDir
     ypos = p.yCoord + zemission * p.yDir / p.zDir
+    ypos += 0.5 * RADIATOR.height
     return xpos, ypos, zemission
 end
 
@@ -168,7 +169,7 @@ Returns:
 """
 function in_focus_acceptance(photon::Photon)::Bool
     # Check if the photon is within the acceptance region
-    if (photon.slope < FOCUS.tan_theta_min) || (photon.slope > FOCUS.tan_theta_max)
+    if photon.slope < FOCUS.tan_theta_min || photon.slope > FOCUS.tan_theta_max
         return false
     end
     return true
