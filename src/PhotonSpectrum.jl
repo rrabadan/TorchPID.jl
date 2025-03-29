@@ -31,7 +31,7 @@ function PhotonSpectrum(
 
     dE = (emax - emin) / nbins
     energy = Vector{Float64}(undef, nbins)
-    efficiency = Vector{Float64}(undef, nbins)
+    eff = Vector{Float64}(undef, nbins)
     nphase = Vector{Float64}(undef, nbins)
     ngroup = Vector{Float64}(undef, nbins)
     nphase_edge = Vector{Float64}(undef, nbins)
@@ -42,7 +42,7 @@ function PhotonSpectrum(
         E = emin + ((i - 1) + 0.5) * dE
 
         energy[i] = E
-        efficiency[i] = efficiency(dht, E)             # call the efficiency function on dht
+        eff[i] = efficiency(dht, E)             # call the efficiency function on dht
         nphase[i] = nphase_Corning(E)                  # using TorchFunctions.jl function
         ngroup[i] = ngroup_Corning(E, nphase[i])       # note: using nphase[i] computed above
         nphase_edge[i] = nphase_Corning(E - 0.5 * dE)
@@ -50,18 +50,7 @@ function PhotonSpectrum(
 
     vgroup = CLIGHT ./ ngroup
 
-    PhotonSpectrum(
-        nbins,
-        emin,
-        emax,
-        dE,
-        energy,
-        efficiency,
-        nphase,
-        ngroup,
-        vgroup,
-        nphase_edge,
-    )
+    PhotonSpectrum(nbins, emin, emax, dE, energy, eff, nphase, ngroup, vgroup, nphase_edge)
 end
 
 """ 
@@ -148,17 +137,18 @@ end
 Generate a random energy value sampled from the photon spectrum distribution.
 """
 function spectrum_random_energy(s::PhotonSpectrum, d::PhotonSpectrumDistribution)::Float64
-    if d.yield_per_mm == 0.0
-        return 0.0
+    energy = 0.0
+    if spectrum_above_threshold(d)
+        v = rand()
+        i = searchsortedfirst(d.cumulative, v)
+        if i <= length(d.cumulative)
+            n = i - 1
+            l = i > 1 ? d.cumulative[i-1] : 0.0
+            r = d.cumulative[i]
+            energy = s.emin + s.dE * (n + (v - l) / (r - l))
+        end
     end
-    v = rand()
-    i = searchsortedfirst(d.cumulative, v)
-    if i <= length(d.cumulative)
-        n = i - 1
-        l = i > 1 ? d.cumulative[i-1] : 0.0
-        r = d.cumulative[i]
-        return s.energy[n] + s.dE * (v - l) / (r - l)
-    end
+    return energy
 end
 
 """ 
