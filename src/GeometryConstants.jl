@@ -182,13 +182,40 @@ function Mask(; y_min::Float64 = -999.0, y_max::Float64 = -999.0)
     Mask(y_min, y_max)
 end
 
+struct SignalParameters
+    gain::Float64
+    threshold::Float64
+    point_spread::Float64
+    time_resolution::Float64
+    effective_constant::Float64
+    effective_linear::Float64
+end
+
+function SignalParameters(;
+    gain::Float64 = 6.5e5,
+    threshold::Float64 = 3.0e-14,     # fC
+    point_spread::Float64 = 0.8,      # mm
+    time_resolution::Float64 = 0.055, # 55 ps
+    effective_constant::Float64 = 0.060,
+    effective_linear::Float64 = 1.4e-5,
+)
+    SignalParameters(
+        gain,
+        threshold,
+        point_spread,
+        time_resolution,
+        effective_constant,
+        effective_linear,
+    )
+end
+
 # Create instances of the structs and export them
 RADIATOR = Radiator(height = 2500.0, width = 660.0, depth = 10.0)
 WEDGE = Wedge(RADIATOR)
 FOCUS = Focus(RADIATOR, WEDGE)
 DETECTOR = Detector(RADIATOR, WEDGE)
 MASK = Mask()
-
+SIGNAL = SignalParameters()
 
 function photonFromFocus(yemission)
     radiator_top = 0.5 * RADIATOR.height - WEDGE.height

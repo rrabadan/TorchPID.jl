@@ -5,7 +5,7 @@ using YAML
 using UnROOT
 using Distributions
 
-export RADIATOR, WEDGE, FOCUS, DETECTOR
+export RADIATOR, WEDGE, FOCUS, DETECTOR, MASK, SIGNAL
 export HitCoordinate, PixelHit
 export DetectorHitTester, efficiency, testHit
 export PhotonSpectrum, PhotonSpectrumDistribution
