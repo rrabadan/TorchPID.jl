@@ -147,7 +147,7 @@ function get_charge(
     return signal
 end
 
-function get_smeared_time(cdt::ChargeDepositTester, time::Float64)::Float64
+function smear_time(cdt::ChargeDepositTester, time::Float64)::Float64
     # Apply Gaussian smearing to the time
     smeared_time = time + randn() * cdt.resolution
     return smeared_time
