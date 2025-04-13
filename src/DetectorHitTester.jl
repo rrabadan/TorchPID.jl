@@ -1,16 +1,17 @@
 """
-    DetectorHitTester
+Struct representing a detector hit testing configuration with various efficiency parameters.
 
-Structure to hold configuration for performing detector hit tests.
+Efficiency calculations combine multiple effects based on the enabled parameters
+Energy thresholds define the valid range for photon detection
 
 # Fields
-- `scaleFactor::Float64`: Factor applied to random value.
-- `emin::Float64`: Minimum energy threshold.
-- `emax::Float64`: Maximum energy threshold.
-- `implement_epotek_cutoff::Bool`: Enable Epotek cutoff.
-- `implement_imperfect_mirror::Bool`: Enable imperfect mirror behavior.
-- `implement_QE::Bool`: Enable quantum efficiency.
-- `implement_CE::Bool`: Enable collection efficiency.
+- `scaleFactor::Float64`: Factor applied to random value in hit testing.
+- `emin::Float64`: Minimum energy threshold for photon detection.
+- `emax::Float64`: Maximum energy threshold for photon detection.
+- `implement_epotek_cutoff::Bool`: Enable Epotek cutoff in efficiency calculation.
+- `implement_imperfect_mirror::Bool`: Enable imperfect mirror behavior in efficiency calculation.
+- `implement_QE::Bool`: Enable quantum efficiency in efficiency calculation.
+- `implement_CE::Bool`: Enable collection efficiency in efficiency calculation.
 """
 struct DetectorHitTester
     scaleFactor::Float64
@@ -23,19 +24,19 @@ struct DetectorHitTester
 end
 
 """
-    DetectorHitTester(; scaleFactor, emin, emax, implement_epotek_cutoff,
-    implement_imperfect_mirror, implement_QE, implement_CE)
+Constructs a `DetectorHitTester` object with specified or default values.
 
-Constructor for DetectorHitTester with default values.
+# Keywords
+- `scaleFactor::Float64=1.0`: Factor applied to random value in hit testing (default: 1.0).
+- `emin::Float64=1.75`: Minimum energy threshold for photon detection (default: 1.75).
+- `emax::Float64=7.00`: Maximum energy threshold for photon detection (default: 7.00).
+- `implement_epotek_cutoff::Bool=true`: Enable Epotek cutoff in efficiency calculation (default: true).
+- `implement_imperfect_mirror::Bool=true`: Enable imperfect mirror behavior in efficiency calculation (default: true).
+- `implement_QE::Bool=true`: Enable quantum efficiency in efficiency calculation (default: true).
+- `implement_CE::Bool=true`: Enable collection efficiency in efficiency calculation (default: true).
 
-# Keyword Arguments
-- `scaleFactor::Float64=1.0`
-- `emin::Float64=1.75`
-- `emax::Float64=7.00`
-- `implement_epotek_cutoff::Bool=true`
-- `implement_imperfect_mirror::Bool=true`
-- `implement_QE::Bool=true`
-- `implement_CE::Bool=true`
+# Returns
+A new `DetectorHitTester` object.
 """
 function DetectorHitTester(;
     scaleFactor::Float64 = 1.0,
@@ -58,17 +59,19 @@ function DetectorHitTester(;
 end
 
 """
-    efficiency(hitTester, energy; glueLayers=1) -> Float64
+Calculates the detection efficiency for a photon of specified energy.
 
-Calculates the efficiency for a given detector hit based on energy and configuration options.
+The efficiency calculation combines various detector effects based on the enabled options
+in the detector configuration, including quantum efficiency, collection efficiency, 
+Epotek cutoff, and mirror reflectivity.
 
 # Arguments
 - `hitTester::DetectorHitTester`: Instance holding configuration parameters.
-- `energy::Float64`: The energy value to test.
-- `glueLayers::Int=1`: Number of glue layers affecting the efficiency.
+- `energy::Float64`: The energy value of the photon in appropriate units.
+- `glueLayers::Int=1`: Number of glue layers affecting the transmission efficiency.
 
 # Returns
-- `Float64`: Calculated efficiency (0.0 when energy is out of threshold bounds).
+- `Float64`: Calculated efficiency value between 0.0 and 1.0. Returns 0.0 when energy is outside the threshold bounds.
 """
 function efficiency(
     hitTester::DetectorHitTester,
@@ -95,17 +98,20 @@ function efficiency(
 end
 
 """
-    testHit(hitTester, energy; glueLayers=1) -> Bool
+Determines if a photon hit is detected based on its energy and detector efficiency.
 
-Determines if a hit is detected by comparing a random value to the calculated efficiency.
+The function generates a random value and scales it by the detector's scale factor.
+This scaled random value is compared against the calculated efficiency to simulate the probabilistic nature of photon detection.
+Efficiency calculation takes into account various detector parameters including quantum efficiency and mirror reflectivity.
+Multiple glue layers affect the transmission efficiency proportionally.
 
 # Arguments
-- `hitTester::DetectorHitTester`: Instance with detector configuration.
-- `energy::Float64`: Energy value of the hit.
+- `hitTester::DetectorHitTester`: Instance with detector configuration parameters.
+- `energy::Float64`: Energy value of the photon in appropriate units.
 - `glueLayers::Int=1`: Number of glue layers used in the efficiency calculation.
 
 # Returns
-- `Bool`: `true` if a hit is registered; otherwise `false`.
+- `Bool`: `true` if a hit is registered (random value < efficiency); otherwise `false`.
 """
 function testHit(hitTester::DetectorHitTester, energy::Float64; glueLayers::Int = 1)::Bool
     random_val = rand() * hitTester.scaleFactor

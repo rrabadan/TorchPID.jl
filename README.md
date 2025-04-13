@@ -2,6 +2,10 @@
 
 Torch PID reconstruction
 
+## Overview
+
+TORCH (Time Of internally Reflected CHerenkov light) is a charged particle identification system that uses Cherenkov radiation and time-of-flight measurements to distinguish between particle types.
+
 ## Description
 
 TorchPID.jl is a Julia project for reconstructing particle identification (PID) using simulation data from the Torch detector.

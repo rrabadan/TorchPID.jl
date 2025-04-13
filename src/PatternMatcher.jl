@@ -1,15 +1,15 @@
-""" 
+"""
 Compute the hit coordinates pattern with the given spectrum, distribution, mapper, particle and beta.
 
-Parameters:
-  - s: PhotonSpectrum representing the energy spectrum of photons.
-  - d: PhotonSpectrumDistribution containing details of the photon distribution.
-  - mapper: PhotonMapper used to map photon properties to detector hit coordinates.
-  - particle: Particle struct representing the particle's trajectory and timing.
-  - beta: Float64 representing the particle's velocity factor.
+# Arguments
+- `particle::Particle`: Particle struct representing the particle's trajectory and timing.
+- `beta::Float64`: The particle's velocity factor relative to the speed of light.
+- `spectrum::PhotonSpectrum`: Energy spectrum of photons.
+- `distribution::PhotonSpectrumDistribution`: Details of the photon distribution.
+- `mapper::PhotonMapper`: Used to map photon properties to detector hit coordinates.
 
-Returns:
-  - Vector{HitCoordinate}: A vector of hit coordinates compatible with the provided spectrum and particle parameters.
+# Returns
+- `Vector{HitCoordinate}`: A vector of hit coordinates compatible with the provided spectrum and particle parameters.
 """
 function project_pattern(
     particle::Particle,
@@ -51,18 +51,20 @@ function project_pattern(
     return hits
 end
 
-""" 
-Constructs the photon spectrum distribution based on the provided spectrum and particle parameters,
-and computes the corresponding hit coordinates compatible with the provided spectrum and particle parameters.
+"""
+Constructs the photon spectrum distribution and computes hit coordinates for a particle.
 
-Parameters:
-  - s: PhotonSpectrum representing the energy spectrum.
-  - mapper: PhotonMapper used to map photon properties to detector hit coordinates.
-  - particle: Particle struct containing the particle's trajectory and timing information.
-  - beta: Float64 representing the particle's velocity factor.
+This is a convenience method that creates the photon distribution internally.
+The function delegates to the main project_pattern method with the constructed distribution.
 
-Returns:
-  - Vector{HitCoordinate}: A vector of hit coordinates computed by this process.
+# Arguments
+- `particle::Particle`: Particle struct containing the particle's trajectory and timing information.
+- `beta::Float64`: The particle's velocity factor relative to the speed of light.
+- `spectrum::PhotonSpectrum`: Energy spectrum of photons.
+- `mapper::PhotonMapper`: Used to map photon properties to detector hit coordinates.
+
+# Returns
+- `Vector{HitCoordinate}`: A vector of hit coordinates computed by this process.
 """
 function project_pattern(
     particle::Particle,
@@ -74,17 +76,20 @@ function project_pattern(
     return projec_pattern(particle, beta, spectrum, photonDistribution, mapper)
 end
 
-""" 
+"""
 Calculate the time offset for a given particle.
 
-Parameters:
-  - particle: Particle struct containing path length, initial time (t0) and z directional component.
-  - beta: Float64 representing the particle's velocity factor relative to the speed of light.
-  - depth: Float64 representing the measured depth in the detector.
-  - time: Float64 representing the initial time offset for the particle.
+Time is adjusted based on the particle's velocity and distance traveled.
+The offset accounts for both the particle's path length and its depth in the detector.
 
-Returns:
-  - Float64: The computed time offset adjusted by the particle's path length and depth.
+# Arguments
+- `particle::Particle`: Particle struct containing path length, initial time (t0) and z directional component.
+- `beta::Float64`: The particle's velocity factor relative to the speed of light.
+- `depth::Float64`: The measured depth in the detector in millimeters (mm).
+- `time::Float64`: The initial time offset for the particle.
+
+# Returns
+- `Float64`: The computed time offset adjusted by the particle's path length and depth.
 """
 function _get_time_offset(
     particle::Particle,
@@ -96,16 +101,18 @@ function _get_time_offset(
     return time + distance / (beta * CLIGHT)
 end
 
-""" 
+"""
 Get the time offset using the particle's default t0.
 
-Parameters:
-  - particle: Particle struct with default t0.
-  - beta: Float64 representing the particle's velocity factor.
-  - depth: Float64 representing the measured depth in the detector.
+This is a convenience method that uses the particle's built-in t0 value.
 
-Returns:
-  - Float64: The computed time offset using particle.t0.
+# Arguments
+- `particle::Particle`: Particle struct with default t0.
+- `beta::Float64`: The particle's velocity factor relative to the speed of light.
+- `depth::Float64`: The measured depth in the detector in millimeters (mm).
+
+# Returns
+- `Float64`: The computed time offset using particle.t0.
 """
 function _get_time_offset(particle::Particle, beta::Float64, depth::Float64)::Float64
     return _get_time_offset(particle, beta, depth, particle.t0)

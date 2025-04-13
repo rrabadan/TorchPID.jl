@@ -1,3 +1,18 @@
+"""
+Struct representing Sellmeier coefficients for refractive index calculations.
+
+The Sellmeier equation is used to model the refractive index as a function of wavelength.
+The equation has the form: n²(λ) = 1 + A₁λ²/(λ²-B₁) + A₂λ²/(λ²-B₂) + A₃λ²/(λ²-B₃)
+Where our coefficients map as: a=A₁, b=B₁, c=A₂, d=B₂, e=A₃, f=B₃
+
+# Fields
+- `a::Float64`: First numerator coefficient in the Sellmeier equation.
+- `b::Float64`: First denominator coefficient in the Sellmeier equation.
+- `c::Float64`: Second numerator coefficient in the Sellmeier equation.
+- `d::Float64`: Second denominator coefficient in the Sellmeier equation.
+- `e::Float64`: Third numerator coefficient in the Sellmeier equation.
+- `f::Float64`: Third denominator coefficient in the Sellmeier equation.
+"""
 struct SellmeierCoefficients
     a::Float64
     b::Float64
@@ -16,6 +31,19 @@ const CORNING = SellmeierCoefficients(
     64.49327320000,
 )
 
+"""
+Calculates the group refractive index of Corning material.
+
+The group refractive index is related to the phase refractive index by: nₗ = n - λ(dn/dλ)
+The calculation uses the Sellmeier equation and its derivative.
+Wavelength in μm is calculated from energy in eV using the formula: λ = 1.24/E
+
+# Arguments
+- `energy_input::Float64`: Photon energy in eV.
+
+# Returns
+- `Float64`: The group refractive index value.
+"""
 function ngroup_Corning(energy_input)
     lambda_um = 1.24 / energy_input
     lambda_um_sq = lambda_um^2
@@ -49,6 +77,20 @@ function ngroup_Corning(energy_input)
     return ngroup
 end
 
+"""
+Calculates the group refractive index of Corning material given the phase index.
+
+This version is more efficient when the phase index is already known.
+Uses the formula: nₗ = n - λ(dn/dλ) where n is the provided phase index.
+Wavelength in μm is calculated from energy in eV using the formula: λ = 1.24/E
+
+# Arguments
+- `energy_input::Float64`: Photon energy in eV.
+- `nphase::Float64`: Phase refractive index at the given energy.
+
+# Returns
+- `Float64`: The group refractive index value.
+"""
 function ngroup_Corning(energy_input::Float64, nphase::Float64)::Float64
     lambda_um = 1.24 / energy_input
     lambda_um_sq = lambda_um^2
@@ -74,6 +116,19 @@ function ngroup_Corning(energy_input::Float64, nphase::Float64)::Float64
     return ngroup
 end
 
+"""
+Calculates the phase refractive index of Corning material.
+
+Uses the Sellmeier equation with CORNING coefficients.
+Wavelength in μm is calculated from energy in eV using the formula: λ = 1.24/E
+The phase index describes how the phase velocity of light changes in the material.
+
+# Arguments
+- `energy_input::Float64`: Photon energy in eV.
+
+# Returns
+- `Float64`: The phase refractive index value.
+"""
 function nphase_Corning(energy_input::Float64)::Float64
     lambda_um = 1.24 / energy_input
     lambda_um_sq = lambda_um^2
@@ -87,10 +142,34 @@ function nphase_Corning(energy_input::Float64)::Float64
     return sqrt(n_sq)
 end
 
+"""
+Returns the collection efficiency constant for the detector system.
+
+This represents the fraction of Cherenkov photons that are successfully collected
+by the optical system.
+This value accounts for various geometric and optical factors in the detector design.
+
+# Returns
+- `Float64`: Collection efficiency value (0.65).
+"""
 function CE()
     return 0.65
 end
 
+"""
+Interpolates the transmission probability through Epotek-305 optical coupling material.
+
+Valid for wavelengths between 200nm and 800nm.
+Returns 0 for wavelengths outside this range.
+Uses linear interpolation between measured data points.
+Wavelength is calculated from energy using the formula: λ(nm) = 1240/E(eV)
+
+# Arguments
+- `energy_input::Float64`: Photon energy in eV.
+
+# Returns
+- `Float64`: Transmission probability value between 0 and 1.
+"""
 function epotek_305_interpolator(energy_input::Float64)
     lambda = 1240.0 / energy_input
     if lambda < 200.0 || lambda > 800.0
@@ -714,6 +793,21 @@ function epotek_305_interpolator(energy_input::Float64)
     return T_epotek_305[index] + (T_epotek_305[index+1] - T_epotek_305[index]) * delta
 end
 
+"""
+Calculates the mirror reflection probability for a given photon energy.
+
+Valid for wavelengths between 200nm and 800nm.
+Returns 0 for wavelengths outside this range.
+Uses linear interpolation between measured data points.
+Wavelength is calculated from energy using the formula: λ(nm) = 1240/E(eV)
+The reflection probability depends on both the mirror material and the angle of incidence.
+
+# Arguments
+- `input_energy::Float64`: Photon energy in eV.
+
+# Returns
+- `Float64`: Reflection probability value between 0 and 1.
+"""
 function mirror_reflect(input_energy::Float64)
     lambda = 1240.0 / input_energy
     if lambda < 200.0 || lambda > 800.0
@@ -797,6 +891,22 @@ function mirror_reflect(input_energy::Float64)
 
 end
 
+"""
+Interpolates the quantum efficiency of the photon detector for a given photon energy.
+
+Valid for wavelengths between 200nm and 800nm.
+Returns 0 for wavelengths outside this range.
+Uses linear interpolation between measured data points.
+Wavelength is calculated from energy using the formula: λ(nm) = 1240/E(eV)
+Quantum efficiency represents the probability that an incident photon produces
+a detectable electron in the photosensor.
+
+# Arguments
+- `input_energy::Float64`: Photon energy in eV.
+
+# Returns
+- `Float64`: Quantum efficiency value between 0 and 1.
+"""
 function QE_interpolator(input_energy::Float64)
     lambda = 1240.0 / input_energy
     if lambda < 200.0 || lambda > 800.0
