@@ -73,7 +73,7 @@ function project_pattern(
     mapper::PhotonMapper,
 )::Vector{HitCoordinate}
     photonDistribution = PhotonSpectrumDistribution(spectrum, particle, beta)
-    return projec_pattern(particle, beta, spectrum, photonDistribution, mapper)
+    return project_pattern(particle, beta, spectrum, photonDistribution, mapper)
 end
 
 """

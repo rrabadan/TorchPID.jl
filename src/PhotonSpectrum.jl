@@ -1,5 +1,8 @@
 """ 
-Struct representing the photon spectrum parameters and arrays.
+    PhotonSpectrum
+
+Type representing a discretized energy spectrum of Cherenkov photons, including detection efficiency and refractive indices derived from TORCH radiator materials.
+The spectrum is defined over a range of energy values, with properties calculated for each energy bin.
 
 # Fields
 - `nbins::Int`: Number of energy bins in the spectrum.
@@ -12,6 +15,30 @@ Struct representing the photon spectrum parameters and arrays.
 - `ngroup::Vector{Float64}`: Array of group refractive index values for each energy bin.
 - `vgroup::Vector{Float64}`: Array of group velocities for each energy bin.
 - `nphase_edge::Vector{Float64}`: Array of phase refractive index values at the left edge of each energy bin.
+
+# Constructors
+    
+    PhotonSpectrum(dht::DetectorHitTester; nbins::Int = 525, emin::Float64 = 1.75, emax::Float64 = 7.00)
+    PhotonSpectrum(; nbins::Int=525, emin::Float64=1.75, emax::Float64=7.00)
+
+## Arguments
+- `dht::DetectorHitTester`: Detector hit tester object containing efficiency parameters.
+
+## Keywords
+- `nbins::Int=525`: Number of energy bins in the spectrum (default: 525).
+- `emin::Float64=1.75`: Minimum energy value in the spectrum (default: 1.75).
+- `emax::Float64=7.00`: Maximum energy value in the spectrum (default: 7.00).
+
+## Examples
+
+```julia
+# Create a PhotonSpectrum with default parameters
+spectrum = PhotonSpectrum()
+
+# Using convenience method is to construct a PhotonSpectrum
+# with a default DetectorHitTester and specified energy parameters.
+spectrum = PhotonSpectrum(nbins=1000, emin=2.0, emax=6.0)
+```
 """
 struct PhotonSpectrum
     nbins::Int
@@ -27,20 +54,6 @@ struct PhotonSpectrum
     nphase_edge::Vector{Float64}
 end
 
-""" 
-Constructs a PhotonSpectrum from a DetectorHitTester using specified energy bin parameters.
-
-# Arguments
-- `dht::DetectorHitTester`: Detector hit tester object containing efficiency parameters.
-
-# Keywords
-- `nbins::Int=525`: Number of energy bins in the spectrum (default: 525).
-- `emin::Float64=1.75`: Minimum energy value in the spectrum (default: 1.75).
-- `emax::Float64=7.00`: Maximum energy value in the spectrum (default: 7.00).
-
-# Returns
-A new `PhotonSpectrum` object with calculated spectrum properties.
-"""
 function PhotonSpectrum(
     dht::DetectorHitTester;
     nbins::Int = 525,
@@ -72,30 +85,56 @@ function PhotonSpectrum(
     PhotonSpectrum(nbins, emin, emax, dE, energy, eff, nphase, ngroup, vgroup, nphase_edge)
 end
 
-""" 
-Constructs a PhotonSpectrum using a default DetectorHitTester with specified energy parameters.
-
-# Keywords
-- `nbins::Int=525`: Number of energy bins in the spectrum (default: 525).
-- `emin::Float64=1.75`: Minimum energy value in the spectrum (default: 1.75).
-- `emax::Float64=7.00`: Maximum energy value in the spectrum (default: 7.00).
-
-# Returns
-A new `PhotonSpectrum` object with calculated spectrum properties using default detector parameters.
-"""
 function PhotonSpectrum(; nbins::Int = 525, emin::Float64 = 1.75, emax::Float64 = 7.00)
     dht = DetectorHitTester(emin = emin, emax = emax)
     PhotonSpectrum(dht, nbins = nbins, emin = emin, emax = emax)
 end
 
 """ 
-Struct representing the photon spectrum distribution details.
+    PhotonSpectrumDistribution
+
+Type encapsulating the photon energy emission probability distribution for a charged particle traversing a TORCH radiator.
 
 # Fields
 - `beta::Float64`: Relativistic beta factor of the particle.
 - `yield_per_mm::Float64`: Expected photon yield per millimeter of radiator.
 - `distribution::Vector{Float64}`: Probability distribution of photon energies.
 - `cumulative::Vector{Float64}`: Cumulative distribution function for sampling photon energies.
+    
+# Constructors
+
+    PhotonSpectrumDistribution(s::PhotonSpectrum, beta::Float64)
+
+Constructs a distribution from a `PhotonSpectrum` and the particle's relativistic beta factor.
+The distribution is calculated using the Cherenkov emission formula, weighted by the detector efficiency.
+The photon yield is based on a factor of 37.0 photons per eV per mm as the base rate.
+
+## Arguments
+- `s::PhotonSpectrum`: The photon spectrum containing energy bin information.
+- `beta::Float64`: Relativistic beta factor (v/c) of the particle.
+
+## Returns
+A new `PhotonSpectrumDistribution` object with photon energy emission probabilities calculated.
+
+# Examples
+
+```julia
+# Create a spectrum
+spectrum = PhotonSpectrum()
+
+# Create a photon energies probability distribution for a particle with beta = 0.99
+distribution = PhotonSpectrumDistribution(spectrum, 0.99)
+
+# Check if the distribution will produce photons
+if spectrum_above_threshold(distribution)
+    # Calculate expected yield over 10mm path
+    yield = spectrum_yield(distribution, 10.0)
+    println("Expected photon yield: \$yield")
+    
+    # Sample a random energy from the distribution
+    energy = spectrum_random_energy(spectrum, distribution)
+end
+```
 """
 struct PhotonSpectrumDistribution
     beta::Float64
@@ -104,19 +143,6 @@ struct PhotonSpectrumDistribution
     cumulative::Vector{Float64}
 end
 
-""" 
-Generates a photon spectrum distribution from a PhotonSpectrum using associated particle's beta parameter.
-
-The distribution is weighted by the Cherenkov emission formula and detector efficiency.
-The yield calculation uses a factor of 37.0 photons per eV per mm as a base rate.
-
-# Arguments
-- `s::PhotonSpectrum`: The photon spectrum containing energy bin information.
-- `beta::Float64`: Relativistic beta factor (v/c) of the particle.
-
-# Returns
-A new `PhotonSpectrumDistribution` object with calculated distribution properties.
-"""
 function PhotonSpectrumDistribution(s::PhotonSpectrum, beta::Float64)
     #distribution = Vector{Float64}(undef, s.nbins)
     cumulative = Vector{Float64}(undef, s.nbins)
@@ -140,7 +166,9 @@ function PhotonSpectrumDistribution(s::PhotonSpectrum, beta::Float64)
 end
 
 """ 
-Returns the phase refractive index value corresponding to the given energy in the photon spectrum.
+    spectrum_nphase(s::PhotonSpectrum, energy::Float64)
+
+`spectrum_nphase` returns the phase refractive index value corresponding to the given energy in the photon spectrum.
 
 # Arguments
 - `s::PhotonSpectrum`: The photon spectrum object.
@@ -155,7 +183,9 @@ function spectrum_nphase(s::PhotonSpectrum, energy::Float64)::Float64
 end
 
 """ 
-Returns the group refractive index value corresponding to the given energy in the photon spectrum.
+    spectrum_ngroup(s::PhotonSpectrum, energy::Float64)
+
+`spectrum_ngroup` returns the group refractive index value corresponding to the given energy in the photon spectrum.
 
 # Arguments
 - `s::PhotonSpectrum`: The photon spectrum object.
@@ -170,7 +200,9 @@ function spectrum_ngroup(s::PhotonSpectrum, energy::Float64)::Float64
 end
 
 """ 
-Calculates the total expected photon yield over the specified pathlength.
+    spectrum_yield(s::PhotonSpectrum, energy::Float64)
+
+`spectrum_yield` calculates the total expected photon yield over the specified pathlength.
 
 # Arguments
 - `d::PhotonSpectrumDistribution`: The photon spectrum distribution.
@@ -184,10 +216,10 @@ function spectrum_yield(d::PhotonSpectrumDistribution, pathlength::Float64)::Flo
 end
 
 """ 
-Generates a random energy value sampled from the photon spectrum distribution.
+    spectrum_random_energy(s::PhotonSpectrum, d::PhotonSpectrumDistribution)
 
-Uses the cumulative distribution function for proper weighted sampling.
-Performs linear interpolation within energy bins for accurate sampling.
+`spectrum_random_energy` samples a random energy value from the photon spectrum distribution using the cumulative distribution function.
+It performs linear interpolation within energy bins to ensure accurate and weighted sampling based on the distribution.
 
 # Arguments
 - `s::PhotonSpectrum`: The photon spectrum object containing energy bin information.
@@ -212,11 +244,11 @@ function spectrum_random_energy(s::PhotonSpectrum, d::PhotonSpectrumDistribution
 end
 
 """ 
-Returns the probability density for a given energy based on the spectrum distribution.
+    spectrum_probability(s::PhotonSpectrum, d::PhotonSpectrumDistribution, energy::Float64)
 
-The function determines which energy bin the provided energy falls into.
-Returns the corresponding normalized distribution value from that bin.
-Returns 0.0 if the energy value is outside the spectrum's defined energy range.
+`spectrum_probability` computes the probability density for a given energy based on the photon spectrum distribution.
+It identifies the energy bin corresponding to the input energy and retrieves the normalized probability density for that bin.
+If the energy is outside the defined spectrum range, the function returns 0.0.
 
 # Arguments
 - `s::PhotonSpectrum`: The photon spectrum object containing energy bin information.
@@ -237,10 +269,10 @@ function spectrum_probability(
 end
 
 """
-Checks if the photon spectrum distribution has a yield per millimeter greater than zero.
+    spectrum_above_threshold(d::PhotonSpectrumDistribution)
 
-This function is used to determine if a distribution will produce any photons.
-A distribution with zero yield indicates the particle is below the Cherenkov threshold.
+`spectrum_above_threshold` determines whether the photon spectrum distribution has a non-zero yield per millimeter. 
+This indicates if the particle's velocity exceeds the Cherenkov threshold, allowing photon production.
 
 # Arguments
 - `d::PhotonSpectrumDistribution`: The photon spectrum distribution to check.
