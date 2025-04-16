@@ -41,7 +41,7 @@ makedocs(
             "Overview" => "api/api.md",
             "Physics Constants" => "api/physics_constants.md",
             "Hit Models" => "api/hit_models.md",
-            "Patter Matcher" => "api/pattern_matcher.md",
+            "Pattern Matcher" => "api/pattern_matcher.md",
         ],
     ],
     checkdocs=:none,

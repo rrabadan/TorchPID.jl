@@ -14,7 +14,14 @@ jobs:
       - uses: actions/checkout@v2
       - uses: julia-actions/setup-julia@latest
         with:
-          version: '1.9'  # Use your preferred Julia version
+          version: '1.11'  # Use your preferred Julia version
+      - name: Build TorchPID package first
+        run: |
+          julia --project=. -e '
+            using Pkg
+            Pkg.instantiate()
+            Pkg.build("TorchPID")
+            Pkg.precompile()'
       - name: Install dependencies
         run: |
           julia --project=docs/ -e '
