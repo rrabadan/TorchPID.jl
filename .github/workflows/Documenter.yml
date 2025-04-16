@@ -14,6 +14,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0  # Get full history
       
       - uses: julia-actions/setup-julia@latest
         with:
@@ -33,9 +35,46 @@ jobs:
             using Pkg
             Pkg.develop(PackageSpec(path=pwd()))
             Pkg.instantiate()'
+      
+      - name: Clean build directory
+        run: rm -rf docs/build
             
-      # Fix: Simplify the build and deploy step
-      - name: Build and deploy
+      - name: Build and deploy with debugging
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: julia --project=docs/ docs/make.jl
+          DOCUMENTER_DEBUG: "true"
+        run: |
+          julia --project=docs/ -e '
+            using Documenter
+            ENV["GITHUB_REPOSITORY"] = "rrabadan/TorchPID.jl"
+            ENV["GITHUB_EVENT_NAME"] = "push"
+            ENV["GITHUB_REF"] = "refs/heads/main"
+            include("docs/make.jl")
+          '
+      
+      # Add a manual deployment step as backup
+      - name: Manual deployment if needed
+        if: success()
+        run: |
+          echo "Checking build directory..."
+          ls -la docs/build
+          
+          if [ -d "docs/build" ] && [ -f "docs/build/index.html" ]; then
+            echo "Build directory exists and contains index.html, setting up git..."
+            git config --global user.name "GitHub Actions"
+            git config --global user.email "actions@github.com"
+            
+            echo "Pushing to gh-pages branch..."
+            git checkout --orphan gh-pages-new
+            git rm -rf .
+            cp -r docs/build/* .
+            git add .
+            git commit -m "Manual docs deployment"
+            git push -f origin gh-pages-new:gh-pages
+          else
+            echo "Error: docs/build directory or index.html not found!"
+            echo "Current directory contents:"
+            ls -la
+            echo "docs directory contents:"
+            ls -la docs || echo "docs directory not found"
+          fi
