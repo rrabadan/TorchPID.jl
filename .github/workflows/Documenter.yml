@@ -33,4 +33,12 @@ jobs:
       - name: Build and deploy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: julia --project=docs/ docs/make.jl
+        run: |
+          julia --project=docs/ -e '
+            using Pkg
+            using Documenter
+            using TorchPID
+            # Force clean build
+            rm(joinpath(@__DIR__, "..", "docs", "build"), force=true, recursive=true)
+            include("../docs/make.jl")
+          '
