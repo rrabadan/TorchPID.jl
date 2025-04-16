@@ -14,9 +14,11 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v2
+      
       - uses: julia-actions/setup-julia@latest
         with:
-          version: '1.11'  # Use your preferred Julia version
+          version: '1.11'
+
       - name: Build TorchPID package first
         run: |
           julia --project=. -e '
@@ -24,21 +26,16 @@ jobs:
             Pkg.instantiate()
             Pkg.build("TorchPID")
             Pkg.precompile()'
+            
       - name: Install dependencies
         run: |
           julia --project=docs/ -e '
             using Pkg
             Pkg.develop(PackageSpec(path=pwd()))
             Pkg.instantiate()'
+            
+      # Fix: Simplify the build and deploy step
       - name: Build and deploy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          julia --project=docs/ -e '
-            using Pkg
-            using Documenter
-            using TorchPID
-            # Force clean build
-            rm(joinpath(@__DIR__, "..", "docs", "build"), force=true, recursive=true)
-            include("../docs/make.jl")
-          '
+        run: julia --project=docs/ docs/make.jl
