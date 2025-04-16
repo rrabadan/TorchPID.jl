@@ -17,7 +17,7 @@ export Photon, test_z_surface_roughness, in_focus_acceptance
 export PhotonMapper, trace_photon
 export project_pattern
 export ChargeDepositTester, charge_over_threshold, get_charge, get_smeared_time, smear_time
-export FrontEnd, add_photon!, reset!, get_hits
+export FrontEnd, create_mcp_images, add_photon!, reset!, get_hits
 export TestBeamSimulator, TestBeamData, generate_particle, generate_photons
 # export EventReader, get_particle, photon_columns, track_columns
 # export PIDAlgorithm, findHitCoordinates, runAlgorithm
@@ -32,7 +32,9 @@ include("Particle.jl")
 include("Photon.jl")
 include("PhotonMapper.jl")
 include("PatternMatcher.jl")
+include("PixelMapper.jl")
 include("ChargeDepositTester.jl")
+include("FrontEnd.jl")
 include("TestBeam.jl")
 #include("EventReader.jl")
 #include("PIDAlgorithm.jl")
