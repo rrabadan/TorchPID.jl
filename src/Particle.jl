@@ -1,10 +1,12 @@
 """
-Struct representing a particle with kinematic and identification fields.
+    Partcle(pid, eventId, trackId, moduleId, xCoord, yCoord, pMag, pMagTrue,
+            xDir, yDir, zDir, truePX, truePY, truePZ, recoPX, recoPY, recoPZ,
+            pathlength, truePathlength, t0, rotMatrix)
 
-"True" values refer to the original, undistorted values, while "reco" values are the reconstructed, measured values.
-The units of position, momentum, and time depend on the specific detector system.
-The rotation matrix is used to transform coordinates from the particle's local reference frame to the global 
-reference frame.
+Represents a particle with kinematic and identification properties.
+"True" values correspond to the original, undistorted quantities, while "reco" values represent the reconstructed, measured quantities. 
+The units for position, momentum, and time depend on the specific detector system.
+The rotation matrix facilitates coordinate transformations between the particle's local reference frame and the global reference frame.
 
 # Fields
 - `pid::Int`: Particle identification code (e.g., PDG ID).
@@ -133,11 +135,12 @@ function Particle(;
     )
 end
 
-""" 
-Calculates the beta factor for the particle with a given mass hypothesis.
+"""
+    particle_beta(p, m)
 
-Beta is calculated as β = p / √(p² + m²), where p is momentum magnitude.
-This factor represents the ratio of the particle's velocity to the speed of light.
+`particle_beta` computes the relativistic beta factor (β) for a particle given its momentum magnitude and a mass hypothesis. 
+Beta is defined as β = p / √(p² + m²), where p is the momentum magnitude and m is the mass. 
+It represents the ratio of the particle's velocity to the speed of light.
 
 # Arguments
 - `p::Particle`: The particle instance.
@@ -146,15 +149,14 @@ This factor represents the ratio of the particle's velocity to the speed of ligh
 # Returns
 - `Float64`: The relativistic beta factor (v/c) of the particle.
 """
-function beta(p::Particle, m::Float64)::Float64
+function particle_beta(p::Particle, m::Float64)::Float64
     return p.pMag / sqrt(p.pMag^2 + m^2)
 end
 
 """
-Calculates the gamma factor for the particle with a given mass hypothesis.
+    partcle_gamma(p, m)
 
-Gamma is calculated as γ = 1 / √(1 - β²), where β is the beta factor.
-Internally calls the beta() function to calculate the beta factor.
+`particle_gamma` computes the relativistic gamma factor for a particle given its momentum magnitude and a mass hypothesis.
 
 # Arguments
 - `p::Particle`: The particle instance.
@@ -163,21 +165,21 @@ Internally calls the beta() function to calculate the beta factor.
 # Returns
 - `Float64`: The relativistic gamma factor of the particle.
 """
-function gamma(p::Particle, m::Float64)::Float64
-    return 1 / sqrt(1 - beta(p, m)^2)
+function particle_gamma(p::Particle, m::Float64)::Float64
+    return 1 / sqrt(1 - particle_beta(p, m)^2)
 end
 
 """ 
-Initializes the rotation matrix of the particle based on its direction components.
+    initial_rotation!(p)
 
-The rotation matrix transforms coordinates from the particle's local reference frame to the global reference frame.
-The calculation depends on the particle's direction components (xDir, yDir, zDir).
-If the perpendicular component (uperp) is zero, the rotation matrix remains unchanged.
+`initial_rotation` computes and initializes the particle's rotation matrix using its direction components (xDir, yDir, zDir). 
+This matrix facilitates the transformation of coordinates from the particle's local reference frame to the global reference frame. 
+If the perpendicular component (uperp) is zero, the rotation matrix is left unchanged.
 
 # Arguments
 - `p::Particle`: The particle instance whose rotation matrix will be initialized.
 """
-function initRotation!(p::Particle)
+function initial_rotation!(p::Particle)
     uperp::Float64 = sqrt(p.xDir^2 + p.yDir^2)
 
     if uperp != 0
@@ -194,10 +196,10 @@ function initRotation!(p::Particle)
 end
 
 """
-Rotates a 3D vector from the particle's local reference frame to the global reference frame.
+    rotate(p, x, y, z)
 
-Uses the particle's rotation matrix to perform the coordinate transformation.
-The rotation preserves the vector's magnitude.
+`rotate` applies the particle's rotation matrix to transform a 3D vector from the local reference frame to the global reference frame. 
+This operation preserves the vector's magnitude while changing its orientation.
 
 # Arguments
 - `p::Particle`: The particle instance containing the rotation matrix.
@@ -222,8 +224,9 @@ function rotate(
 end
 
 """
-An enumeration representing different particle types.
+    ParticleType
 
+An enumeration representing different particle types.
 Used to categorize particles for identification and physics calculations.
 Each enum value corresponds to a specific particle with well-defined properties.
 
@@ -245,8 +248,9 @@ Each enum value corresponds to a specific particle with well-defined properties.
 end
 
 """
-Struct representing the properties of a particle type.
+    ParticleProperty(name, mass, pdgid)
 
+Type representing the properties of a particle type.
 The PDG ID is a standardized identifier used in particle physics.
 Mass values are constants defined elsewhere in the code.
 
@@ -262,11 +266,12 @@ struct ParticleProperty
 end
 
 """
-Dictionary mapping `ParticleType` values to their corresponding `ParticleProperty`.
+    PARTICLE_PROPERTIES
 
-Provides a convenient way to access particle properties by type.
-Contains entries for standard particles: electron, muon, pion, kaon, and proton.
-Each entry maps a ParticleType enum value to its corresponding ParticleProperty instance.
+A dictionary mapping `ParticleType` values to their corresponding `ParticleProperty` instances. 
+This provides a convenient way to access particle properties by type. 
+It includes entries for standard particles such as electron, muon, pion, kaon, and proton, 
+with each entry associating a `ParticleType` enum value to its respective `ParticleProperty`.
 """
 const PARTICLE_PROPERTIES = Dict(
     ELECTRON => ParticleProperty("electron", ELECTRON_MASS, 11),
@@ -277,11 +282,11 @@ const PARTICLE_PROPERTIES = Dict(
 )
 
 """ 
-Determines the particle type and properties based on the particle's PDG ID.
+    get_type_and_properties(p)
 
-Searches the PARTICLE_PROPERTIES dictionary for a matching PDG ID.
-Returns UNKNOWN type with null properties if no match is found.
-The absolute value of the PDG ID is used for the comparison to handle antiparticles.
+`get_type_and_properties` identifies the particle type and retrieves its properties based on the particle's PDG ID. 
+It searches the `PARTICLE_PROPERTIES` dictionary for a matching PDG ID, using the absolute value to account for antiparticles. 
+If no match is found, it returns `UNKNOWN` as the type and null properties.
 
 # Arguments
 - `p::Particle`: The particle instance whose type and properties are to be determined.
@@ -299,11 +304,11 @@ function get_type_and_properties(p::Particle)
 end
 
 """ 
-Looks up the mass of a particle based on its PDG ID.
+    get_particle_mass(pid)
 
-Searches the PARTICLE_PROPERTIES dictionary for a matching PDG ID.
-The absolute value of the PDG ID is used for the comparison to handle antiparticles.
-Returns 0.0 if no matching particle type is found.
+`get_particle_mass` retrieves the mass of a particle using its PDG ID. 
+It searches the `PARTICLE_PROPERTIES` dictionary for a matching PDG ID, using the absolute value to account for antiparticles. 
+If no match is found, it returns a default mass of 0.0.
 
 # Arguments
 - `pid::Int64`: The Particle Data Group ID (PDG ID).

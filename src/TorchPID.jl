@@ -11,7 +11,7 @@ export DetectorHitTester, efficiency, testHit
 export PhotonSpectrum, PhotonSpectrumDistribution
 export spectrum_nphase, spectrum_ngroup
 export spectrum_yield, spectrum_random_energy, spectrum_probability
-export Particle, beta, gamma, initRotation, rotate, get_particle_mass
+export Particle, particle_beta, particle_gamma, initial_rotation, rotate, get_particle_mass
 export PARTICLE_PROPERTIES
 export Photon, test_z_surface_roughness, in_focus_acceptance
 export PhotonMapper, trace_photon
