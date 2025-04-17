@@ -1,8 +1,7 @@
 """ 
-    PhotonSpectrum
+    PhotonSpectrum(nbins, emin, emax, dE, energy, efficiency, nphase, ngroup, vgroup, nphase_edge)
 
 Type representing a discretized energy spectrum of Cherenkov photons, including detection efficiency and refractive indices derived from TORCH radiator materials.
-The spectrum is defined over a range of energy values, with properties calculated for each energy bin.
 
 # Fields
 - `nbins::Int`: Number of energy bins in the spectrum.
@@ -20,6 +19,10 @@ The spectrum is defined over a range of energy values, with properties calculate
     
     PhotonSpectrum(dht::DetectorHitTester; nbins::Int = 525, emin::Float64 = 1.75, emax::Float64 = 7.00)
     PhotonSpectrum(; nbins::Int=525, emin::Float64=1.75, emax::Float64=7.00)
+
+Constructs a Cherenkov photon spectrum over a specified energy range, with properties computed for each energy bin.
+The refractive indices are derived from TORCH radiator materials, and detection efficiencies are determined using the provided `DetectorHitTester` object.
+A default `DetectorHitTester` is created if not provided.
 
 ## Arguments
 - `dht::DetectorHitTester`: Detector hit tester object containing efficiency parameters.
@@ -91,7 +94,7 @@ function PhotonSpectrum(; nbins::Int = 525, emin::Float64 = 1.75, emax::Float64 
 end
 
 """ 
-    PhotonSpectrumDistribution
+    PhotonSpectrumDistribution(beta, yield_per_mm, distribution, cumulative)
 
 Type encapsulating the photon energy emission probability distribution for a charged particle traversing a TORCH radiator.
 
@@ -218,8 +221,8 @@ end
 """ 
     spectrum_random_energy(s::PhotonSpectrum, d::PhotonSpectrumDistribution)
 
-`spectrum_random_energy` samples a random energy value from the photon spectrum distribution using the cumulative distribution function.
-It performs linear interpolation within energy bins to ensure accurate and weighted sampling based on the distribution.
+`spectrum_random_energy` samples a random energy value from the photon spectrum distribution using the cumulative distribution function. 
+    It performs linear interpolation within energy bins to ensure accurate and weighted sampling based on the distribution.
 
 # Arguments
 - `s::PhotonSpectrum`: The photon spectrum object containing energy bin information.
@@ -247,8 +250,8 @@ end
     spectrum_probability(s::PhotonSpectrum, d::PhotonSpectrumDistribution, energy::Float64)
 
 `spectrum_probability` computes the probability density for a given energy based on the photon spectrum distribution.
-It identifies the energy bin corresponding to the input energy and retrieves the normalized probability density for that bin.
-If the energy is outside the defined spectrum range, the function returns 0.0.
+    It identifies the energy bin corresponding to the input energy and retrieves the normalized probability density for that bin. 
+    If the energy is outside the defined spectrum range, the function returns 0.0.
 
 # Arguments
 - `s::PhotonSpectrum`: The photon spectrum object containing energy bin information.
@@ -272,7 +275,7 @@ end
     spectrum_above_threshold(d::PhotonSpectrumDistribution)
 
 `spectrum_above_threshold` determines whether the photon spectrum distribution has a non-zero yield per millimeter. 
-This indicates if the particle's velocity exceeds the Cherenkov threshold, allowing photon production.
+    This indicates if the particle's velocity exceeds the Cherenkov threshold, allowing photon production.
 
 # Arguments
 - `d::PhotonSpectrumDistribution`: The photon spectrum distribution to check.

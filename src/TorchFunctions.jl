@@ -1,9 +1,8 @@
 """
 `SellmeierCoefficients` is a struct representing Sellmeier coefficients for refractive index calculations.
-
-The Sellmeier equation is used to model the refractive index as a function of wavelength.
-The equation has the form: n²(λ) = 1 + A₁λ²/(λ²-B₁) + A₂λ²/(λ²-B₂) + A₃λ²/(λ²-B₃)
-Where our coefficients map as: a=A₁, b=B₁, c=A₂, d=B₂, e=A₃, f=B₃
+    The Sellmeier equation is used to model the refractive index as a function of wavelength. 
+    The equation has the form: n²(λ) = 1 + A₁λ²/(λ²-B₁) + A₂λ²/(λ²-B₂) + A₃λ²/(λ²-B₃), 
+    Where our coefficients map as: a=A₁, b=B₁, c=A₂, d=B₂, e=A₃, f=B₃
 
 # Fields
 - `a::Float64`: First numerator coefficient in the Sellmeier equation.
@@ -40,10 +39,10 @@ const CORNING = SellmeierCoefficients(
     ngroup_Corning(energy_input::Float64)
     ngroup_Corning(energy_input::Float64, nphase::Float64)
 
-`ngroup_Corning` calculates the group refractive index of Corning material (quartz).
-The group refractive index quantifies how the group velocity of light varies within the material. 
-It is derived from the phase refractive index using the relation: nₗ = n - λ(dn/dλ). 
-This calculation employs the Sellmeier equation and its derivative, with the wavelength in μm computed from energy in eV using the formula: λ = 1.24/E.
+`ngroup_Corning` calculates the group refractive index of Corning material (quartz). 
+    The group refractive index quantifies how the group velocity of light varies within the material. 
+    It is derived from the phase refractive index using the relation: nₗ = n - λ(dn/dλ). 
+    This calculation employs the Sellmeier equation and its derivative, with the wavelength in μm computed from energy in eV using the formula: λ = 1.24/E.
 
 # Arguments
 - `energy_input::Float64`: Photon energy in eV.
@@ -113,10 +112,10 @@ end
 """
     nphase_Corning(energy_input::Float64)
 
-`nphase_corning` calculates the phase refractive index of Corning material.
-The phase refractive index quantifies how the phase velocity of light propagates through the material.
-It is calculated using the Sellmeier equation with the CORNING coefficients.
-The wavelength in μm is derived from the photon energy in eV using the formula: λ = 1.24/E.
+`nphase_corning` calculates the phase refractive index of Corning material. 
+    The phase refractive index quantifies how the phase velocity of light propagates through the material.
+    It is calculated using the Sellmeier equation with the CORNING coefficients. 
+    The wavelength in μm is derived from the photon energy in eV using the formula: λ = 1.24/E.
 
 # Arguments
 - `energy_input::Float64`: Photon energy in eV.
@@ -141,8 +140,8 @@ end
    CE()
 
 `CE` returns the collection efficiency constant for the detector system.
-This represents the fraction of Cherenkov photons that are successfully collected
-by the optical system. This value accounts for various geometric and optical factors in the detector design.
+    This represents the fraction of Cherenkov photons that are successfully collected
+    by the optical system. This value accounts for various geometric and optical factors in the detector design.
 
 # Returns
 - `Float64`: Collection efficiency value (0.65).
@@ -155,8 +154,8 @@ end
     epotek_305_interpolator(energy_input::Float64)
 
 `epotek_305_interpolator` interpolates the transmission probability through Epotek-305 optical coupling material.
-Valid for wavelengths between 200nm and 800nm. Returns 0 for wavelengths outside this range.
-Wavelength is calculated from energy using the formula: λ(nm) = 1240/E(eV)
+    Valid for wavelengths between 200nm and 800nm. Returns 0 for wavelengths outside this range.
+    Wavelength is calculated from energy using the formula: λ(nm) = 1240/E(eV)
 
 # Arguments
 - `energy_input::Float64`: Photon energy in eV.
@@ -790,10 +789,10 @@ end
 """
     mirrior_reflect(input_energy::Float64)
 
-`mirror_reflect` calculates the mirror reflection probability for a given photon energy.
-Applicable for wavelengths between 200nm and 800nm. Returns 0 for wavelengths outside this range.
-The wavelength is derived from energy using the formula: λ(nm) = 1240/E(eV).
-The reflection probability is influenced by the mirror material and the angle of incidence.
+`mirror_reflect` calculates the mirror reflection probability for a given photon energy. 
+    Applicable for wavelengths between 200nm and 800nm. Returns 0 for wavelengths outside this range. 
+    The wavelength is derived from energy using the formula: λ(nm) = 1240/E(eV).
+    The reflection probability is influenced by the mirror material and the angle of incidence.
 
 # Arguments
 - `input_energy::Float64`: Photon energy in eV.
@@ -887,10 +886,10 @@ end
 """
     QE_interpolator(input_energy::Float64)
 
-`QE_interpolator` interpolates the quantum efficiency of the photon detector for a given photon energy.
-Valid for wavelengths between 200nm and 800nm. Returns 0 for wavelengths outside this range.
-Wavelength is calculated from energy using the formula: λ(nm) = 1240/E(eV)
-Quantum efficiency represents the probability that an incident photon generates a detectable electron in the photosensor.
+`QE_interpolator` interpolates the quantum efficiency of the photon detector for a given photon energy. 
+    Valid for wavelengths between 200nm and 800nm. Returns 0 for wavelengths outside this range.
+    Wavelength is calculated from energy using the formula: λ(nm) = 1240/E(eV). 
+    Quantum efficiency represents the probability that an incident photon generates a detectable electron in the photosensor.
 
 # Arguments
 - `input_energy::Float64`: Photon energy in eV.

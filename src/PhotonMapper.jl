@@ -1,27 +1,28 @@
 """
-    PhotonMapper
+    PhotonMapper(blackened_sides blackened_bottom,
+                 blackened, surface_roughness,
+                 max_x_reflections)
 
 Type representing the photon mapping configuration for photon propagation.
 
 # Fields
-- `blackened_sides::Bool`: Enable blackening of side reflections.
-- `blackened_bottom::Bool`: Ignore bottom reflections if true.
-- `blackened_focus::Bool`: Apply focus reflection handling.
-- `surface_roughness::Bool`: Consider surface roughness effects.
-- `max_x_reflections::Int`: Maximum number of x-direction reflections.
+- `blackened_sides::Bool`: If true, photons reflecting off the radiator's sides are absorbed.
+- `blackened_bottom::Bool`: If true, photons reflecting off the radiator's bottom are ignored.
+- `blackened_focus::Bool`: If true, reflections in the focus region are handled differently.
+- `surface_roughness::Bool`: If true, surface imperfections of the radiator are considered.
+- `max_x_reflections::INt`: Specifies the maximum allowable x-direction reflections before the photon is discarded.
 
 # Constructors
 
-    PhotonMapper(; blackened_sides::Bool=false, blackened_bottom::Bool=false,
+    PhotonMapper(; 
+        blackened_sides::Bool=false,
+        blackened_bottom::Bool=false,
+        blackened_focus::Bool=false,
+        surface_roughness::Bool=false,
+        max_x_reflections::Int=10
+    )
 
-Constructs a `PhotonMapper` with customizable options for photon propagation.
-- `blackened_sides`: If true, photons reflecting off the radiator's sides are absorbed.
-- `blackened_bottom`: If true, photons reflecting off the radiator's bottom are ignored.
-- `blackened_focus`: If true, reflections in the focus region are handled differently.
-- `surface_roughness`: If true, surface imperfections of the radiator are considered.
-- `max_x_reflections`: Specifies the maximum allowable x-direction reflections before the photon is discarded.
-
-## Arguments
+## Keywords
 - `blackened_sides::Bool=false`: Enable absorption of side reflections.
 - `blackened_bottom::Bool=false`: Ignore bottom reflections if true.
 - `blackened_focus::Bool=false`: Handle focus region reflections differently.

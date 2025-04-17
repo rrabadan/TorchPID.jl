@@ -1,5 +1,7 @@
 """
-    Photon
+    Photon(energy, xdir, ydir, zdir, xpos, ypos, zpos, slope,
+           np, ng, lambda, emissionTime, is_x_reflected,
+           is_y_reflected, is_z_reflected)
 
 Type representing a photon emitted by TORCH's radiator and propagated to the detector.
 Position coordinates are in millimeters (mm).
@@ -22,19 +24,14 @@ Position coordinates are in millimeters (mm).
 - `is_z_reflected::Bool`: Flag indicating reflection status in z-direction.
 
 # Constructors
-    Photon(
-        p::Particle,
-        beta::Float64,
-        nphase::Float64,
-        ngroup::Float64,
-        energy::Float64
-    )
+    Photon(p, beta, nphase, ngroup, energy)
 
-Constructs a Photon instance by calculating its direction, emission point, and reflection flags based on the particle's properties and photon energy and refractive indices.
-The Cherenkov angle is derived from the particle's velocity and the phase refractive index.
-A random azimuthal angle (phi) is generated uniformly between 0 and 2π to simulate isotropic emission.
-The emission point is sampled uniformly along the radiator depth to mimic realistic photon production.
-Reflection flags are computed by comparing the photon's direction with the critical angle for total internal reflection. Surface roughness effects are excluded from this constructor and are handled separately.
+Creates a Photon instance by determining its direction, emission point, and reflection flags based on the particle's properties, photon energy, and refractive indices. 
+The Cherenkov angle is calculated using the particle's velocity and the phase refractive index. 
+A random azimuthal angle (phi) is uniformly sampled between 0 and 2π to simulate isotropic emission. 
+The emission point is randomly chosen along the radiator depth to reflect realistic photon production. 
+Reflection flags are set by comparing the photon's direction with the critical angle for total internal reflection. 
+Surface roughness effects are excluded from this constructor and are handled separately.
 
 ## Arguments
 - `p::Particle`: The particle instance emitting the photon.
@@ -114,9 +111,9 @@ end
 """
     test_z_surface_roughness(photon::Photon, nreflec::Int)::Bool
 
-`test_z_surface_roughness` tests the photon surface roughness in the z-direction.
-Surface roughness is modeled as a Gaussian effect dependent on wavelength.
-The probability of passing decreases with number of reflections.
+`test_z_surface_roughness` tests the photon surface roughness in the z-direction. 
+    Surface roughness is modeled as a Gaussian effect dependent on wavelength. 
+    The probability of passing decreases with number of reflections.
 
 # Arguments
 - `photon::Photon`: The photon instance.
@@ -134,10 +131,9 @@ end
 """ 
     in_focus_acceptance(photon::Photon)::Bool
 
-`in_focus_acceptance` checks whether the photon is within the focus acceptance region.
-
-Acceptance is based on the slope of the photon trajectory.
-Checks against minimum and maximum slope angles defined in FOCUS constants.
+`in_focus_acceptance` checks whether the photon is within the focus acceptance region. 
+    Acceptance is based on the slope of the photon trajectory. 
+    Checks against minimum and maximum slope angles defined in FOCUS constants.
 
 # Arguments
 - `photon::Photon`: The photon instance.
@@ -157,9 +153,9 @@ end
 """ 
     _photon_direction(p::Particle, costhetac::Float64, sinthetac::Float64, phic::Float64)
 
-`_photon_direction` computes the direction of the photon emitted by the particle in the lab frame.
-The photon direction is determined from the Cherenkov angle and azimuthal angle and 
-rotated to the lab frame using the particle's direction.
+`_photon_direction` computes the direction of the photon emitted by the particle in the lab frame. 
+    The photon direction is determined from the Cherenkov angle and azimuthal angle and 
+    rotated to the lab frame using the particle's direction.
 
 # Arguments
 - `p::Particle`: The particle instance.
@@ -193,8 +189,9 @@ end
     _photon_emission(p::Particle)::Tuple{Float64,Float64,Float64}
 
 `_photon_emission` calculates the photon emission coordinates at a specified z depth in the radiator.
-The emission point is determined by the particle's entry point and direction.
-For x and y coordinates, the values are adjusted based on the particle's direction.
+    The emission point is determined by the particle's entry point and direction.
+    For x and y coordinates, the values are adjusted based on the particle's direction.
+    A single-argument method uses half the radiator depth as the emission point.
 
 # Arguments
 - `p::Particle`: The particle instance.
@@ -204,8 +201,6 @@ For x and y coordinates, the values are adjusted based on the particle's directi
 # Returns
 - `Tuple{Float64,Float64,Float64}`: A tuple containing (xpos, ypos, zpos) of the emission point.
 
-# Implementation Notes
-The single-argument method uses half the radiator depth as the emission point.
 """
 function _photon_emission(p::Particle, zemission::Float64)::Tuple{Float64,Float64,Float64}
     xpos = p.xCoord + zemission * p.xDir / p.zDir

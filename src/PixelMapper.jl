@@ -1,8 +1,8 @@
 """
-Determines the MCP (Micro-Channel Plate) number based on the x-coordinate.
+    get_mcp_number(x)
 
-The function applies an offset of half the radiator width to the x-coordinate.
-The MCP number is calculated by dividing the position by the detector width.
+`get_mcp_number` calculates the MCP (Micro-Channel Plate) number corresponding to a given x-coordinate. 
+It offsets the x-coordinate by half the radiator width and determines the MCP number by dividing the adjusted position by the detector width.
 
 # Arguments
 - `x::Float64`: The x-coordinate in the detector coordinate system.
@@ -16,11 +16,11 @@ function get_mcp_number(x::Float64)::Int
 end
 
 """
-Calculates the x-pixel number within a specific MCP from the x-coordinate.
-
-The function first calculates which MCP the coordinate belongs to.
-It then calculates the local position within that MCP, accounting for gaps.
-The pixel number is determined by dividing by the x-pixel size.
+    get_mcp_xpixel(x)
+    
+`get_mcp_xpixel` determines the x-pixel number within a specific MCP based on the x-coordinate. 
+The function identifies the MCP containing the coordinate, calculates the local position within that MCP while accounting for gaps, 
+and computes the pixel number by dividing the local position by the x-pixel size.
 
 # Arguments
 - `x::Float64`: The x-coordinate in the detector coordinate system.
@@ -39,10 +39,11 @@ function get_mcp_xpixel(x::Float64)::Int
 end
 
 """
-Calculates the y-pixel number from the y-coordinate.
+    get_mcp_ypixel(y)
 
-The function calculates the pixel number based on the y-coordinate's position relative to the minimum y-value.
-Returns -1 if the calculated pixel number is outside the detector's y-pixel range.
+`get_mcp_ypixel` calculates the y-pixel number within a specific MCP from the y-coordinate. 
+It determines the pixel number relative to the minimum y-value in the detector coordinate system. 
+If the computed pixel number is outside the valid y-pixel range, the function returns -1.
 
 # Arguments
 - `y::Float64`: The y-coordinate in the detector coordinate system.
@@ -59,13 +60,11 @@ function get_ypixel(y::Float64)::Int
 end
 
 """
-Calculates the global x-pixel number from the x-coordinate.
+    get_xpixel(x)
 
-First determines which detector the coordinate belongs to.
-Returns -1 if the detector number is invalid.
-Calculates the local position on the detector, accounting for gaps.
-Returns -1 if the local pixel number is outside the valid range.
-Converts the local pixel number to a global pixel number based on detector number.
+`get_xpixel` computes the global x-pixel number from the x-coordinate. 
+It identifies the detector, calculates the local pixel position, and converts it to a global pixel number. 
+Returns -1 if the detector or pixel is invalid.
 
 # Arguments
 - `x::Float64`: The x-coordinate in the detector coordinate system.
@@ -98,10 +97,11 @@ function get_xpixel(x::Float64)::Int
 end
 
 """
-Calculates the x-position relative to the MCP center.
+    get_mcp_xposition(x)
 
-The function applies an offset of half the radiator width to the x-coordinate.
-The MCP is determined, and the position is adjusted relative to that MCP's center.
+`get_mcp_xposition` calculates the x-position relative to the center of the MCP. 
+The function offsets the x-coordinate by half the radiator width, determines the MCP, 
+and adjusts the position relative to the center of that MCP.
 
 # Arguments
 - `x::Float64`: The x-coordinate in the detector coordinate system.
@@ -117,10 +117,10 @@ function get_mcp_xposition(x::Float64)::Float64
 end
 
 """
-Calculates the time pixel number from a time value without checking bounds.
+    get_tpixel_nocheck(t)
 
-The function calculates the pixel number based on the time value's position relative to the minimum time value.
-No bounds checking is performed in this function.
+`get_tpixel_nocheck` computes the time pixel number from a given time value without performing bounds checking. 
+It determines the pixel number based on the time value's offset from the minimum time value and the time bin size.
 
 # Arguments
 - `t::Float64`: The time value.
@@ -135,10 +135,10 @@ function get_tpixel_nocheck(t::Float64)::Int
 end
 
 """
-Calculates the time pixel number from a time value with bounds checking.
+    get_tpixel(t)
 
-Uses get_tpixel_nocheck to calculate the initial pixel number.
-Returns -1 if the calculated pixel number is outside the detector's time pixel range.
+`get_tpixel` computes the time pixel number from a given time value, ensuring it falls within valid bounds. 
+It leverages `get_tpixel_nocheck` for the initial calculation and returns -1 if the result is outside the detector's time pixel range.
 
 # Arguments
 - `t::Float64`: The time value.
