@@ -1,5 +1,7 @@
 """
-Struct representing the photon mapping configuration for photon propagation.
+    PhotonMapper
+
+Type representing the photon mapping configuration for photon propagation.
 
 # Fields
 - `blackened_sides::Bool`: Enable blackening of side reflections.
@@ -7,6 +9,27 @@ Struct representing the photon mapping configuration for photon propagation.
 - `blackened_focus::Bool`: Apply focus reflection handling.
 - `surface_roughness::Bool`: Consider surface roughness effects.
 - `max_x_reflections::Int`: Maximum number of x-direction reflections.
+
+# Constructors
+
+    PhotonMapper(; blackened_sides::Bool=false, blackened_bottom::Bool=false,
+
+Constructs a `PhotonMapper` with customizable options for photon propagation.
+- `blackened_sides`: If true, photons reflecting off the radiator's sides are absorbed.
+- `blackened_bottom`: If true, photons reflecting off the radiator's bottom are ignored.
+- `blackened_focus`: If true, reflections in the focus region are handled differently.
+- `surface_roughness`: If true, surface imperfections of the radiator are considered.
+- `max_x_reflections`: Specifies the maximum allowable x-direction reflections before the photon is discarded.
+
+## Arguments
+- `blackened_sides::Bool=false`: Enable absorption of side reflections.
+- `blackened_bottom::Bool=false`: Ignore bottom reflections if true.
+- `blackened_focus::Bool=false`: Handle focus region reflections differently.
+- `surface_roughness::Bool=false`: Account for surface imperfections.
+- `max_x_reflections::Int=10`: Maximum number of x-direction reflections allowed.
+
+## Returns
+- `PhotonMapper`: A new PhotonMapper instance with the specified configuration.
 """
 struct PhotonMapper
     blackened_sides::Bool
@@ -16,25 +39,6 @@ struct PhotonMapper
     max_x_reflections::Int
 end
 
-"""
-Construct a PhotonMapper with configurable options.
-
-When `blackened_sides` is true, photons that would reflect off the sides of the radiator are absorbed.
-When `blackened_bottom` is true, photons that would reflect off the bottom of the radiator are ignored.
-When `blackened_focus` is true, special handling is applied to reflections in the focus region.
-When `surface_roughness` is true, calculations account for the non-perfect surface of the radiator.
-`max_x_reflections` limits the number of times a photon can reflect in the x-direction before it's discarded.
-
-# Arguments
-- `blackened_sides::Bool=false`: Enable blackening of side reflections.
-- `blackened_bottom::Bool=false`: Ignore bottom reflections if true.
-- `blackened_focus::Bool=false`: Apply focus reflection handling.
-- `surface_roughness::Bool=false`: Consider surface roughness effects.
-- `max_x_reflections::Int=10`: Maximum number of x-direction reflections.
-
-# Returns
-- `PhotonMapper`: A new PhotonMapper instance with the specified configuration.
-"""
 function PhotonMapper(;
     blackened_sides::Bool = false,
     blackened_bottom::Bool = false,
@@ -52,7 +56,12 @@ function PhotonMapper(;
 end
 
 """
-Traces the photon through the entire optical system from emission to detection.
+    trace_photon(mapper::PhotonMapper, photon::Photon, t0::Float64)
+
+`trace_photon` simulates the photon's journey through the optical system, from emission to detection. 
+It propagates the photon to the top of the plate, accounting for y-direction and z-direction reflections, surface roughness, and pathlength accumulation.
+It then traces the photon to the focus block, simulating its interaction with the focusing optics, and finally to the detector plane, where it checks for acceptance criteria.
+The function returns the detected hit coordinate if the photon is successfully traced, or `nothing` if any tracing step fails.
 
 # Arguments
 - `mapper::PhotonMapper`: The photon mapping configuration.
@@ -121,7 +130,9 @@ function trace_photon(
 end
 
 """
-Propagates the photon to the top of the plate.
+    _trace_to_top_of_plate(mapper::PhotonMapper, photon::Photon)
+
+`_trace_to_top_of_plate` propagates the photon to the top of the plate, accounting for y-direction and z-direction reflections, surface roughness, and pathlength accumulation.
 
 # Arguments
 - `mapper::PhotonMapper`: The mapping configuration.
@@ -181,7 +192,9 @@ function _trace_to_top_of_plate(
 end
 
 """
-Propagates the photon from the top of the flat section to the entrance of the focus block.
+    _trace_to_focus(zp::Float64, typ::Float64, tzp::Float64)
+
+`_trace_to_focus` propagates the photon from the top of the flat section to the entrance of the focus block.
 
 # Arguments
 - `zp::Float64`: Position at top of the plate
@@ -224,7 +237,10 @@ function _trace_to_focus(
 end
 
 """
-Propagates the photon from the entrance of the focussing block to the MCPs.
+    _trace_to_detector(yf::Float64, tyf::Float64, tzf::Float64)
+
+`_trace_to_detector` simulates the photon's propagation from the entrance of the focusing block to the detector plane, accounting for mirror reflections and acceptance criteria.
+
 
 # Arguments
 - `yf::Float64`: Position at entrance of the focus block
@@ -310,11 +326,11 @@ function _trace_to_detector(
 end
 
 """
-Calculates the x position on the detector by projecting the photon's x coordinate.
+    _project_x_detector_position(mapper::PhotonMapper, photon::Photon, pathlength::Float64)
 
-Accounts for reflections in the x-direction based on the mapper configuration.
-Returns `nothing` if blackened sides is enabled and reflection is required, the photon 
-cannot reflect in x, or the maximum number of reflections is exceeded.
+`_project_x_detector_position` calculates the photon's x-coordinate on the detector plane by projecting its trajectory.
+It considers x-direction reflections based on the mapper's configuration.
+Returns `nothing` if side blackening is enabled and reflection is required, the photon cannot reflect in x, or the maximum allowed reflections is exceeded.
 
 # Arguments
 - `mapper::PhotonMapper`: The mapping configuration.
