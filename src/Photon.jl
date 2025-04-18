@@ -178,8 +178,21 @@ function _photon_direction(
     zprime = costhetac
 
     # rotate to the lab frame
+    #    uperp = sqrt(p.xDir^2 + p.yDir^2)
+    #    if uperp == 0.0
+    #        xdir = xprime
+    #        ydir = yprime
+    #        zdir = zprime
+    #    else
+    #        xdir = (p.xDir * p.zDir / uperp) * xprime -
+    #               (p.yDir / uperp) * yprime + p.xDir * zprime
+    #        ydir = (p.yDir * p.zDir / uperp) * xprime +
+    #               (p.xDir / uperp) * yprime + p.yDir * zprime
+    #        zdir = -uperp * xprime + p.zDir * zprime
+    #    end
+
     xdir, ydir, zdir = rotate(p, xprime, yprime, zprime)
-    slope = abs(zdir / xdir)
+    slope = abs(zdir / ydir)
 
     return xdir, ydir, zdir, slope
 end
