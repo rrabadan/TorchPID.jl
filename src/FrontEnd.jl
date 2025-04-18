@@ -1,8 +1,13 @@
-# ===== Type Definitions =====
+"""
+    MCPPixelMap = Vector{Vector{Vector{Tuple{Int,Float64}}}}
+"""
 const MCPPixelMap = Vector{Vector{Vector{Tuple{Int,Float64}}}}
 
+
 """
-Struct representing a Microchannel Plate (MCP) image with pixel data.
+    MCPImage
+
+Type representing a Microchannel Plate (MCP) image with pixel data.
 
 # Fields
 - `n_xpixels::Int`: Number of pixels in the x-direction.
@@ -10,6 +15,22 @@ Struct representing a Microchannel Plate (MCP) image with pixel data.
 - `n_tpixels::Int`: Number of pixels in the time dimension.
 - `n_deadtime::Int`: Dead time in time pixels.
 - `pixelmap::MCPPixelMap`: 3D structure containing hit data for each pixel.
+
+# Constructor
+    `MCPImage(n_xpixels::Int, n_ypixels::Int, n_tpixels::Int, n_deadtime::Int)`: 
+  
+Initializes an MCP image with the specified dimensions and an empty pixel map.
+The pixel map is a 3D array where each element is a vector of tuples,
+representing the time pixel and charge associated with a hit.
+
+## Arguments
+- `n_xpixels::Int`: Number of pixels in the x-direction.
+- `n_ypixels::Int`: Number of pixels in the y-direction.
+- `n_tpixels::Int`: Number of pixels in the time dimension.
+- `n_deadtime::Int`: Dead time in time pixels.
+
+## Returns
+- `MCPImage`: An initialized MCPImage object with an empty pixel map.
 """
 struct MCPImage
     n_xpixels::Int
@@ -25,23 +46,29 @@ function MCPImage(n_xpixels::Int, n_ypixels::Int, n_tpixels::Int, n_deadtime::In
 end
 
 """
-Adds a hit to the MCP image at the specified pixel position.
+    _fill_pixelmap!(mcpimage::MCPImage, xpixel::Int, ypixel::Int, tpixel::Int; charge::Float64=-1.0)
+    _fill_pixelmap!(mcpimage::MCPImage, hit::PixelHit)
 
-Returns early if the pixel coordinates are outside the valid range of the MCP image.
-Handles negative time values up to `-mcpimage.n_deadtime`.
-Updates the pixelmap field of the MCPImage by adding a tuple of (tpixel, charge) to the specified pixel.
+`_fill_pixelmap!` adds a hit to the MCPImage at the specified pixel position.  
+It returns early if the pixel coordinates are outside the valid range of the MCP image.  
+Handles negative time values up to `-mcpimage.n_deadtime`.  
+Updates the `pixelmap` field of the `MCPImage` by appending a tuple `(tpixel, charge)` to the specified pixel.
 
-# Arguments
-- `mcpimage::MCPImage`: The MCP image to add the hit to.
+# Arguments Method 1
+- `mcpimage::MCPImage`: The MCP image to update.
 - `xpixel::Int`: X-coordinate of the pixel.
 - `ypixel::Int`: Y-coordinate of the pixel.
 - `tpixel::Int`: Time coordinate of the pixel.
 - `charge::Float64`: Charge value associated with the hit (default: -1.0).
 
+# Arguments Method 2
+- `mcpimage::MCPImage`: The MCP image to update.
+- `hit::PixelHit`: A `PixelHit` object containing the pixel coordinates and charge. (for the second method)
+
 # Returns
-- `Nothing`: The function modifies the input MCPImage in place.
+- `Nothing`: The function modifies the input `MCPImage` in place.
 """
-function _fill_hit!(
+function _fill_pixelmap!(
     mcpimage::MCPImage,
     xpixel::Int,
     ypixel::Int,
@@ -66,29 +93,16 @@ function _fill_hit!(
     end
 end
 
-"""
-Adds a pixel hit to the MCP image.
-
-Delegates to the _fill_hit! function that takes individual coordinates, extracting the 
-xpixel, ypixel, tpixel, and charge values from the PixelHit object.
-
-# Arguments
-- `mcpimage::MCPImage`: The MCP image to add the hit to.
-- `hit::PixelHit`: The pixel hit object containing position and time data.
-
-# Returns
-- `Nothing`: The function modifies the input MCPImage in place.
-"""
-function _fill_hit!(mcpimage::MCPImage, hit::PixelHit)
-    _fill_hit!(mcpimage, hit.xpixel, hit.ypixel, hit.tpixel; charge = hit.charge)
+function _fill_pixelmap!(mcpimage::MCPImage, hit::PixelHit)
+    _fill_pixelmap!(mcpimage, hit.xpixel, hit.ypixel, hit.tpixel; charge = hit.charge)
 end
 
 """
-Checks if a pixel at the specified coordinates is occupied by any hits.
+    _is_pixelmap_occupied(pixelmap::MCPPixelMap, xpixel::Int, ypixel::Int)
 
-Returns false if the given coordinates are outside the valid range of the pixel map.
-A pixel is considered occupied if its hit list is not empty.
-The function accounts for 1-based indexing in Julia by adding 1 to the input coordinates.
+`_is_pixelmap_occupied` determines whether a pixel at the specified coordinates contains any hits.  
+It returns `false` if the coordinates are out of bounds.  
+A pixel is deemed occupied if its hit list is non-empty.
 
 # Arguments
 - `pixelmap::MCPPixelMap`: The pixel map to check.
@@ -98,7 +112,7 @@ The function accounts for 1-based indexing in Julia by adding 1 to the input coo
 # Returns
 - `Bool`: `true` if the pixel has at least one hit recorded; otherwise `false`.
 """
-function _is_occupied(pixelmap::MCPPixelMap, xpixel::Int, ypixel::Int)
+function _is_pixelmap_occupied(pixelmap::MCPPixelMap, xpixel::Int, ypixel::Int)
 
     if (xpixel < 0) ||
        (xpixel >= length(pixelmap)) ||
@@ -112,10 +126,10 @@ function _is_occupied(pixelmap::MCPPixelMap, xpixel::Int, ypixel::Int)
 end
 
 """
-Resets all pixel data in the pixel map.
+    _reset_pixelmap!(pixelmap::MCPPixelMap)
 
-Iterates through all pixels in the map and empties each hit list.
-Does not change the structure of the pixel map, only clears the hit data.
+`reset_pixelmap` clears all hit data in the pixel map without altering its structure.  
+It iterates through all pixels and empties their hit lists, leaving the pixel map intact.
 
 # Arguments
 - `pixelmap::MCPPixelMap`: The pixel map to reset.
@@ -123,7 +137,7 @@ Does not change the structure of the pixel map, only clears the hit data.
 # Returns
 - `Nothing`: The function modifies the input pixel map in place.
 """
-function _reset!(pixelmap::MCPPixelMap)
+function _reset_pixelmap!(pixelmap::MCPPixelMap)
     # Reset the pixel map to empty
     for col in pixelmap
         for row in col
@@ -133,30 +147,31 @@ function _reset!(pixelmap::MCPPixelMap)
 end
 
 """
-Retrieves hits from a specific pixel location in the MCP image.
+    _get_hits(mcpimage::MCPImage, mcp::Int, xpixel::Int, ypixel::Int)
+    _get_hits(mcpimage::MCPImage, mcp::Int, xpixel::Int)
+    _get_hits(mcpimage::MCPImage, mcp::Int)
 
-Adjusts for 1-based indexing in Julia when accessing the pixel map.
-Returns nothing if the specified pixel has no hits.
-Sorts hits by time in descending order before processing.
-Only includes hits with positive time values.
-Respects detector dead time by only including hits that are separated by more than 
-the dead time from the previous hit.
-Each hit in the returned collection is represented as a PixelHit with global coordinates.
+`_get_hits` retrieves hits from a specific pixel or set of pixels in the MCP image.  
+It extracts hits from the specified pixel location(s) and returns them as a collection of `PixelHit` objects.  
+If no hits are found, it returns `nothing`.  
+Hits are sorted in descending order of time, and only those with positive time values are included.  
+The function respects the detector's dead time, excluding hits that occur within the dead time of a previous hit.  
+Each returned `PixelHit` includes global coordinates and associated charge information.
 
 # Arguments
 - `mcpimage::MCPImage`: The MCP image containing pixel data.
-- `xpixel::Int`: X-coordinate of the pixel.
-- `ypixel::Int`: Y-coordinate of the pixel.
 - `mcp::Int`: MCP detector index.
+- `xpixel::Int`: X-coordinate of the pixel (optional, depending on the method).
+- `ypixel::Int`: Y-coordinate of the pixel (optional, depending on the method).
 
 # Returns
-- `Union{Nothing,Vector{PixelHit}}`: Collection of pixel hits or nothing if no hits are found.
+- `Union{Nothing,Vector{PixelHit}}`: A collection of pixel hits or `nothing` if no hits are found.
 """
 function _get_hits(
     mcpimage::MCPImage,
+    mcp::Int,
     xpixel::Int,
     ypixel::Int,
-    mcp::Int,
 )::Union{Nothing,Vector{PixelHit}}
 
     pixelmap = mcpimage.pixelmap
@@ -178,7 +193,7 @@ function _get_hits(
     sorted_hits = sort(pixelmap[x][y], by = first, rev = true)
 
     # If the first hit's t value is > 0, add it to the collection
-    if sorted_tpixels[1][1] > 0
+    if sorted_hits[1][1] > 0
         push!(
             hitcollection,
             PixelHit(xpixel + offset, ypixel, sorted_hits[1][1], sorted_hits[1][2]),
@@ -196,27 +211,13 @@ function _get_hits(
     return hitcollection
 end
 
-"""
-Retrieves all hits from a specific MCP detector.
-
-Iterates through all pixels in the specified MCP image.
-For each occupied pixel, retrieves hits using the _get_hits function and adds them to the collection.
-Returns nothing if no hits are found across the entire MCP.
-
-# Arguments
-- `mcpimage::MCPImage`: The MCP image containing pixel data.
-- `mcp::Int`: The index of the MCP to retrieve hits for.
-
-# Returns
-- `Union{Nothing,Vector{PixelHit}}`: A vector of pixel hits or nothing if no hits are found.
-"""
 function _get_hits(mcpimage::MCPImage, mcp::Int)::Union{Nothing,Vector{PixelHit}}
     pixelmap = mcpimage.pixelmap
     hitcollection = Vector{PixelHit}(undef, 0)
     for x = 1:mcpimage.n_xpixels
         for y = 1:mcpimage.n_ypixels
-            if _is_occupied(pixelmap, x - 1, y - 1)
-                pixelhits = _get_hits(mcpimage, x - 1, y - 1, mcp)
+            if _is_pixelmap_occupied(pixelmap, x - 1, y - 1)
+                pixelhits = _get_hits(mcpimage, mcp, x - 1, y - 1)
                 if pixelhits !== nothing
                     append!(hitcollection, pixelhits)
                 end
@@ -230,26 +231,10 @@ function _get_hits(mcpimage::MCPImage, mcp::Int)::Union{Nothing,Vector{PixelHit}
     end
 end
 
-"""
-Retrieves hits from a specific x-coordinate across all y-coordinates in an MCP.
-
-Returns nothing if the x-coordinate is outside the valid range.
-Iterates through all y-coordinates at the specified x-coordinate.
-For each occupied pixel, retrieves hits using the _get_hits function and adds them to the collection.
-Returns nothing if no hits are found at the specified x-coordinate.
-
-# Arguments
-- `mcpimage::MCPImage`: The MCP image containing pixel data.
-- `xpixel::Int`: X-coordinate to retrieve hits from.
-- `mcp::Int`: MCP detector index.
-
-# Returns
-- `Union{Nothing,Vector{PixelHit}}`: Collection of pixel hits or nothing if no hits are found.
-"""
 function _get_hits(
     mcpimage::MCPImage,
-    xpixel::Int,
     mcp::Int,
+    xpixel::Int,
 )::Union{Nothing,Vector{PixelHit}}
 
     hitcollection = Vector{PixelHit}(undef, 0)
@@ -257,7 +242,7 @@ function _get_hits(
         return nothing
     end
     for y = 1:mcpimage.n_ypixels
-        if _is_occupied(pixelmap, xpixel, y - 1)
+        if _is_pixelmap_occupied(pixelmap, xpixel, y - 1)
             pixelhits = _get_hits(mcpimage, xpixel, y - 1, mcp)
             if pixelhits !== nothing
                 append!(hitcollection, pixelhits)
@@ -272,10 +257,10 @@ function _get_hits(
 end
 
 """
-Calculates the total number of hits in a pixel map.
+    _get_number_hits(pixelmap::MCPPixelMap)
 
-Iterates through the entire pixel map structure, summing the number of hits in each pixel.
-Each entry in a pixel's hit list is counted as one hit.
+`_get_number_hits` computes the total number of hits in a pixel map by iterating through all pixels and summing the lengths of their hit lists. 
+Each entry in a pixel's hit list represents a single hit.
 
 # Arguments
 - `pixelmap::MCPPixelMap`: The pixel map containing hit data.
@@ -294,10 +279,14 @@ function _get_number_hits(pixelmap::MCPPixelMap)::Int
     return total_hits
 end
 
-# ===== FrontEnd Definition and Constructor =====
 
 """
-Struct representing the front-end electronics configuration for the TORCH detector.
+    FrontEnd(
+        n_mcps::Int, n_xpixels::Int, n_ypixels::Int, n_tpixels::Int, n_deadtime::Int,
+        sharing_mode::Bool, smear_time::Bool
+    )
+
+Type representing the front-end electronics configuration for the TORCH detector.
 
 # Fields
 - `n_mcps::Int`: Number of Microchannel Plate (MCP) detectors.
@@ -307,25 +296,13 @@ Struct representing the front-end electronics configuration for the TORCH detect
 - `n_deadtime::Int`: Dead time in time pixels.
 - `sharing_mode::Bool`: Whether charge sharing between adjacent pixels is enabled.
 - `smear_time::Bool`: Whether time smearing is applied to hits.
-"""
-struct FrontEnd
-    n_mcps::Int
-    n_xpixels::Int
-    n_ypixels::Int
-    n_tpixels::Int
-    n_deadtime::Int
-    sharing_mode::Bool
-    smear_time::Bool
-end
 
-const MCPImageArray = Vector{MCPImage}
+# Constructor
+    `FrontEnd(; n_mcps::Int, n_xpixels::Int, n_ypixels::Int, n_tpixels::Int, n_deadtime::Int,
+              sharing_mode::Bool, smear_time::Bool)`
 
-"""
-Constructs a FrontEnd object with the specified or default parameters.
-
-Uses detector constants from the DETECTOR global configuration when no values are specified.
-The sharing_mode parameter determines whether charge from a hit is shared among adjacent pixels.
-The smear_time parameter enables time smearing to simulate timing imprecision.
+Constructs a FrontEnd object with the specified parameters or defaults to values from the global DETECTOR configuration.
+The `sharing_mode` parameter determines whether charge sharing between adjacent pixels is enabled, and the `smear_time` parameter enables time smearing to simulate timing imprecision.
 
 # Keywords
 - `n_mcps::Int`: Number of MCP detectors (default: DETECTOR.n_detectors).
@@ -339,6 +316,21 @@ The smear_time parameter enables time smearing to simulate timing imprecision.
 # Returns
 - `FrontEnd`: A configured front-end electronics object.
 """
+struct FrontEnd
+    n_mcps::Int
+    n_xpixels::Int
+    n_ypixels::Int
+    n_tpixels::Int
+    n_deadtime::Int
+    sharing_mode::Bool
+    smear_time::Bool
+end
+
+"""
+    MCPImageArray = Vector{MCPImage}
+"""
+const MCPImageArray = Vector{MCPImage}
+
 function FrontEnd(;
     n_mcps::Int = DETECTOR.n_detectors,
     n_xpixels::Int = DETECTOR.n_xpixels,
@@ -352,10 +344,10 @@ function FrontEnd(;
 end
 
 """
-Creates an array of MCP image objects based on the front-end configuration.
+    create_mcp_images(fe::FrontEnd)::MCPImageArray
 
-Creates one MCP image for each MCP detector specified in the front-end configuration.
-Each MCP image is initialized with the pixel dimensions and dead time from the front-end configuration.
+`create_mcp_images` initializes an array of MCP image objects based on the front-end configuration.  
+For each MCP detector specified in the front-end configuration, it creates an MCP image initialized with the specified pixel dimensions and dead time.
 
 # Arguments
 - `fe::FrontEnd`: Front-end electronics configuration.
@@ -372,7 +364,13 @@ function create_mcp_images(fe::FrontEnd)::MCPImageArray
 end
 
 """
-Finds pixels that would be activated by a hit at the specified position.
+    find_pixels(fe::FrontEnd, cdt::ChargeDepositTester, xpos::Float64, ypos::Float64)
+
+`find_pixels` determines the pixels activated by a hit at a given position.  
+It validates the MCP number and pixel coordinates to ensure they are within bounds.  
+The function iterates over nearby pixels, checking if the charge exceeds the threshold.  
+For each activated pixel, it calculates the time pixel and charge, creating a `PixelHit` object.  
+This process identifies all pixels affected by the hit.
 
 # Arguments
 - `fe::FrontEnd`: Front-end electronics configuration.
@@ -453,7 +451,16 @@ function find_pixels(
 end
 
 """
-Adds a photon hit to the MCP image array without charge sharing.
+    add_without_sharing!(
+        mcps::MCPImageArray, fe::FrontEnd, cdt::ChargeDepositTester,
+        xpos::Float64, ypos::Float64, time::Float64
+    )
+    add_without_sharing!(
+        mcps::MCPImageArray, fe::FrontEnd, cdt::ChargeDepositTester,
+        hit::HitCoordinate
+    )
+
+`add_without_sharing!` adds a photon hit to the MCP image array without charge sharing.
 
 # Arguments
 - `mcps::MCPImageArray`: Array of MCP image objects to update.
@@ -488,23 +495,10 @@ function add_without_sharing!(
     # smear_time
     tprime = fe.smear_time ? smear_time(cdt, time) : time
     tpixel = get_tpixel_nocheck(tprime)
-    println("mcp: ", mcp, " xcentre: ", xcentre, " ycentre: ", ycentre, " tpixel: ", tpixel)
-    _fill_hit!(mcps[mcp+1], xcentre, ycentre, tpixel) # should it be mcp+1 the index?
+    _fill_pixelmap!(mcps[mcp+1], xcentre, ycentre, tpixel) # index should be mcp+1
     return
 end
 
-"""
-Adds a photon hit to the MCP image array without charge sharing.
-
-# Arguments
-- `mcps::MCPImageArray`: Array of MCP image objects to update.
-- `fe::FrontEnd`: Front-end electronics configuration.
-- `cdt::ChargeDepositTester`: Charge deposit test configuration.
-- `hit::HitCoordinate`: Hit coordinate object containing position and time information.
-
-# Returns
-Nothing.
-"""
 function add_without_sharing!(
     mcps::MCPImageArray,
     fe::FrontEnd,
@@ -515,7 +509,18 @@ function add_without_sharing!(
 end
 
 """
-Adds a photon hit to the MCP image array, with or without charge sharing based on configuration.
+    add_photon!(
+        mcps::MCPImageArray, fe::FrontEnd, cdt::ChargeDepositTester,
+        xpos::Float64, ypos::Float64, time::Float64
+    )
+    add_photon!(
+        mcps::MCPImageArray, fe::FrontEnd, cdt::ChargeDepositTester,
+        hit::HitCoordinate
+    )
+
+`add_photon!` updates the MCP image array with a photon hit, considering the front-end configuration.  
+If charge sharing is enabled, it identifies affected pixels and updates their pixel maps.  
+Otherwise, it directly updates the pixel map of the corresponding MCP image.
 
 # Arguments
 - `mcps::MCPImageArray`: Array of MCP image objects to update.
@@ -541,7 +546,7 @@ function add_photon!(
         pixels = find_pixels(fe, cdt, xpos, ypos)
         if pixels !== nothing
             for pixel in pixels
-                _fill_hit!(mcps[mcp+1], pixel) # should it be mcp+1 the index?
+                _fill_pixelmap!(mcps[mcp+1], pixel) # should it be mcp+1 the index?
             end
         end
     else
@@ -549,18 +554,6 @@ function add_photon!(
     end
 end
 
-"""
-Adds a photon hit to the MCP image array using a HitCoordinate object.
-
-# Arguments
-- `mcps::MCPImageArray`: Array of MCP image objects to update.
-- `fe::FrontEnd`: Front-end electronics configuration.
-- `cdt::ChargeDepositTester`: Charge deposit test configuration.
-- `hit::HitCoordinate`: Hit coordinate object containing position and time information.
-
-# Returns
-Nothing.
-"""
 function add_photon!(
     mcps::MCPImageArray,
     fe::FrontEnd,
@@ -571,7 +564,10 @@ function add_photon!(
 end
 
 """
-Resets all MCP images by clearing their pixel maps.
+    reset!(mcps::MCPImageArray, fe::FrontEnd)
+
+`reset!` clears all hits from the MCP image array by resetting the pixel map of each MCP image.  
+This function is useful for reinitializing the detector state before starting a new measurement or simulation.
 
 # Arguments
 - `mcps::MCPImageArray`: Array of MCP image objects to reset.
@@ -582,12 +578,15 @@ Nothing.
 """
 function reset!(mcps::MCPImageArray, fe::FrontEnd)
     for i = 1:fe.n_mcps
-        _reset!(mcps[i].pixelmap)
+        _reset_pixelmap!(mcps[i].pixelmap)
     end
 end
 
 """
-Retrieves all hits from all MCPs in the detector.
+    get_hits(mcps::MCPImageArray, fe::FrontEnd)
+
+`get_hits` retrieves all hits from the MCP image array by iterating through each MCP image and collecting hits from all pixels.  
+If no hits are found, it returns `nothing`. This function aggregates hits from all MCPs in the detector.
 
 # Arguments
 - `mcps::MCPImageArray`: Array of MCP image objects to get hits from.
