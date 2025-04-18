@@ -130,7 +130,7 @@ It determines the pixel number based on the time value's offset from the minimum
 """
 function get_tpixel_nocheck(t::Float64)::Int
     # Get the time pixel number without checking bounds
-    tpixel = floor(Int, t - DETECTOR.t_min) / DETECTOR.t_bin
+    tpixel = floor(Int, (t - DETECTOR.t_min) / DETECTOR.t_bin)
     return tpixel
 end
 
