@@ -77,7 +77,7 @@ function PhotonSpectrum(
         E = emin + ((i - 1) + 0.5) * dE
 
         energy[i] = E
-        eff[i] = efficiency(dht, E)             # call the efficiency function on dht
+        eff[i] = photon_efficiency(dht, E)             # call the efficiency function on dht
         nphase[i] = nphase_Corning(E)                  # using TorchFunctions.jl function
         ngroup[i] = ngroup_Corning(E, nphase[i])       # note: using nphase[i] computed above
         nphase_edge[i] = nphase_Corning(E - 0.5 * dE)
