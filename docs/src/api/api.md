@@ -4,8 +4,12 @@ Documentation for "TorchPID.jl" interface.
 
 ## All components
 
-- [Physics Constants](physics_constants.md): Essential physical constants used across the simulation.
+- [Physics Constants](physics_constants.md): Definitions of commonly used physical constants in the TORCH detector simulations.
 
-- [Hit Models](hit_models.md): Structures and methods for modeling and analyzing hit detection.
+- [Hit Models](hit_models.md): Types and methods for modeling hit detection.
 
-- [Photon Spectrum](photonspectrum.md):
+- [Photon](photon.md): Core definitions and utilities for photon properties and behavior.
+
+- [Photon Mapper](photonmapper.md): Tools for simulating the photon propagation through TORCH's optical system.
+
+- [Photon Spectrum](photonspectrum.md): Tools to model the Cherenkov radiation photon spectra within the TORCH detector

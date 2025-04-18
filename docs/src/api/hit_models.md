@@ -1,12 +1,14 @@
 # Hit Models API
 
+Types and methods for modeling hit detection.
+
 ```@meta
 CurrentModule = TorchPID
 DocTestSetup = quote
     using TorchPID
 ```
 
-This section covers the hit detection and representation models used in TorchPID.
+### Public API
 
 ```@autodocs
 Modules = [TorchPID]

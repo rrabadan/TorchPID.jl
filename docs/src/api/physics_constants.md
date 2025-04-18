@@ -6,7 +6,9 @@ DocTestSetup = quote
     using TorchPID
 ```
 
-Constants used throughout the TORCH detector simulation.
+Definitions of commonly used physical constants in the TORCH detector simulations.
+
+### Public API
 
 ```@autodocs
 Modules = [TorchPID]

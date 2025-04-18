@@ -1,6 +1,7 @@
 # Cherenkov Radiation Spectra
 
-TorchPID.jl provides tools to model the Cherenkov radiation photon spectra within the TORCH detector.\n 
+TorchPID.jl provides tools to model the Cherenkov radiation photon spectra within the TORCH detector.
+
 These tools facilitate the generation and sampling of photon energy distributions, incorporating detection efficiency and refractive index variations caused by charged particles traversing the TORCH radiator.
 
 ## Key components
@@ -61,6 +62,17 @@ spectrum = PhotonSpectrum(
     nbins = 525,  # Number of energy points
     emin = 1.75,  # Minimum photon energy (eV)
     emax = 7.00,  # Maximum photon energy (eV)
+)
+
+beta = 0.99
+distribution = PhotonSpectrumDistribution(
+    spectrum
+    beta
+)
+
+photon_energy = spectrum_random_energy(
+    spectrum,
+    distribution
 )
 ```
 

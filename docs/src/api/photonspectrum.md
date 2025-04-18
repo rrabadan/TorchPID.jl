@@ -7,7 +7,9 @@ DocTestSetup = quote
 end
 ```
 
-This section covers the pattern matching algorithms and models used in TorchPID for particle identification.
+Tools to model the Cherenkov radiation photon spectra within the TORCH detector
+
+### Public API
 
 ```@autodocs
 Modules = [TorchPID]
