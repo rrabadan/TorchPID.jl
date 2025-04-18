@@ -84,7 +84,7 @@ function trace_photon(
         return nothing
     end
 
-    if in_focus_acceptance(photon)
+    if !in_focus_acceptance(photon)
         return nothing
     end
 
@@ -124,7 +124,7 @@ function trace_photon(
     end
 
     # detected time is production time + time of propagation
-    tdetected = t0 + (pathlength * photon.ng / CLIGHT)
+    tdetected = t0 + (tot_pathlength * photon.ng / CLIGHT)
 
     HitCoordinate(xdetected, ydetected, tdetected)
 
