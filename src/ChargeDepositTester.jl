@@ -1,11 +1,10 @@
 import SpecialFunctions: erfc
 
-# Private helper functions
 """
-Calculates the integral of a Gaussian distribution between specified bounds.
+    gaussian_integral(v, s, min, max)
 
-Uses the complementary error function (erfc) for numerical stability.
-The result represents the area under the Gaussian curve between the specified bounds.
+`_gaussian_integral` is a helper function that calculates the integral of a Gaussian distribution between specified bounds.
+It leverages the complementary error function (erfc) for numerical stability. The result represents the area under the Gaussian curve within the given range.
 
 # Arguments
 - `v::Float64`: Mean value of the Gaussian distribution.
@@ -22,8 +21,9 @@ function _gaussian_integral(v::Float64, s::Float64, min::Float64, max::Float64):
 end
 
 """
-Generates a cache of Gaussian integral values for time binning.
+    _set_resolution(resolution)
 
+`_set_resolution` is a helper (internal) function that generates a cache of Gaussian integral values for time binning.
 Creates a cache for -n_time to n_time bins centered around zero.
 Each value represents the probability of a hit falling within that time bin.
 
@@ -50,8 +50,9 @@ function _set_resolution(resolution::Float64)::Vector{Float64}
 end
 
 """
-Calculates the maximum number of bins that can contain a signal above threshold.
+    _get_max_bins(a, b, n, point_spread, gain, threshold)
 
+`_get_max_bins` calculates the maximum number of bins that can contain a signal above threshold.
 Iteratively calculates signal in neighboring bins until it falls below threshold.
 Used to determine how many neighboring pixels might be activated by a single hit.
 
@@ -86,10 +87,13 @@ function _get_max_bins(
 end
 
 """
-Struct representing a charge deposit tester with detector response parameters.
+    ChargeDepositTester(gain, threshold, point_spread, time_resolution,
+                        space_step, n_time, n_space, n_xbins, n_ybins,
+                        charge_sharing, clustering)
 
-This struct contains all parameters necessary for realistic detector response simulation.
-Parameters account for point spread, time resolution, and signal thresholds.
+Represents a charge deposit tester with parameters for simulating detector response. 
+This struct encapsulates all necessary configuration details, including point spread, 
+time resolution, signal thresholds, and spatial-temporal binning, for realistic detector modeling.
 
 # Fields
 - `gain::Float64`: Signal amplification factor.
@@ -103,6 +107,23 @@ Parameters account for point spread, time resolution, and signal thresholds.
 - `n_ybins::Int`: Maximum number of y bins that can have signal above threshold.
 - `charge_sharing::Bool`: Whether charge sharing between pixels is enabled.
 - `clustering::Bool`: Whether clustering of signals is enabled.
+
+# Constructors
+
+    ChargeDepositTester(;n_time=40, n_space=100, charge_sharing=false, clustering=false)
+
+Creates a `ChargeDepositTester` instance using global constants from `SIGNAL` and `DETECTOR` for configuration.
+Determines the maximum number of bins affected in the x and y directions based on the point spread and threshold.
+Sets the spatial step size to 10% of the smaller detector dimension.
+
+# Keywords
+- `n_time::Int = 40`: Number of time bins in each direction.
+- `n_space::Int = 100`: Number of spatial bins for simulation.
+- `charge_sharing::Bool = false`: Enable charge sharing between pixels.
+- `clustering::Bool = false`: Enable clustering of signals.
+
+# Returns
+- `ChargeDepositTester`: A new ChargeDepositTester object with calculated detector parameters.
 """
 struct ChargeDepositTester
     gain::Float64
@@ -121,22 +142,6 @@ struct ChargeDepositTester
     #yf::Vector{Float64}
 end
 
-"""
-Constructs a `ChargeDepositTester` object with specified or default values.
-
-Uses global constants from SIGNAL and DETECTOR for configuration.
-Calculates maximum affected bins in x and y directions.
-Space step is set to 10% of the minimum detector dimension.
-
-# Arguments
-- `n_time::Int = 40`: Number of time bins in each direction.
-- `n_space::Int = 100`: Number of spatial bins for simulation.
-- `charge_sharing::Bool = false`: Enable charge sharing between pixels.
-- `clustering::Bool = false`: Enable clustering of signals.
-
-# Returns
-- `ChargeDepositTester`: A new ChargeDepositTester object with calculated detector parameters.
-"""
 function ChargeDepositTester(;
     n_time::Int = 40,
     n_space::Int = 100,
@@ -183,12 +188,12 @@ function ChargeDepositTester(;
 end
 
 # Functions operating on ChargeDepositTester
-
 """
-Determines if a charge exceeds the detection threshold.
+    charge_over_threshold(cdt, charge, min, max)
 
-Uses Gaussian spreading to calculate the fraction of charge collected in the given range.
-Multiplies by gain and quantum efficiency to determine if signal exceeds threshold.
+`charge_over_threshold` checks if a charge exceeds the detection threshold.
+It calculates the fraction of charge collected in the specified range using Gaussian spreading.
+The result is scaled by the gain and quantum efficiency to determine if the signal surpasses the threshold.
 
 # Arguments
 - `cdt::ChargeDepositTester`: The charge deposit tester configuration.
@@ -211,10 +216,10 @@ function charge_over_threshold(
 end
 
 """
-Determines if a charge at a given position exceeds the detection threshold.
+    charge_over_threshold(cdt, x, xmin, xmax, y, ymin, ymax)
 
-Calculates 2D Gaussian integral to determine charge fraction in the specified region.
-Accounts for both x and y dimensions using separable Gaussian distributions.
+`charge_over_threshold` determines whether a charge at a specific position surpasses the detection threshold.
+It computes the 2D Gaussian integral to evaluate the charge fraction within the defined region, considering both x and y dimensions independently using separable Gaussian distributions.
 
 # Arguments
 - `cdt::ChargeDepositTester`: The charge deposit tester configuration.
@@ -244,10 +249,11 @@ function charge_over_threshold(
 end
 
 """
-Calculates the signal produced by a charge at a given position.
+    get_charge(cdt, charge, min, max)
 
-Similar to charge_over_threshold but returns the actual signal value rather than a boolean.
-Uses 2D Gaussian spreading to calculate signal contribution in the specified region.
+`get_charge` computes the signal generated by a charge within a specified region.
+Unlike `charge_over_threshold`, it returns the actual signal value instead of a boolean.
+The calculation uses 2D Gaussian spreading to determine the signal contribution in the defined range.
 
 # Arguments
 - `cdt::ChargeDepositTester`: The charge deposit tester configuration.
@@ -277,17 +283,27 @@ function get_charge(
 end
 
 """
-Applies Gaussian smearing to a time value based on the detector's time resolution.
+    smear_time(cdt::ChargeDepositTester, time::Float64)
+    smear_time(cdt::ChargeDepositTester, hit::HitCoordinate)
 
-Adds random Gaussian noise using the detector's time resolution parameter.
-Models the detector's finite time resolution capabilities.
+`smear_time` introduces Gaussian smearing to a time value, simulating the detector's finite time resolution. 
+It adds random noise drawn from a Gaussian distribution with a standard deviation equal to the detector's time resolution.
+
+# Methods
+1. `smear_time(cdt::ChargeDepositTester, time::Float64)`: 
+   Takes a time value and returns the smeared time value.
+
+2. `smear_time(cdt::ChargeDepositTester, hit::HitCoordinate)`:
+   Takes a `HitCoordinate` object and returns a new `HitCoordinate` with the time value smeared.
 
 # Arguments
 - `cdt::ChargeDepositTester`: The charge deposit tester configuration.
-- `time::Float64`: The original time value to be smeared.
+- `time::Float64`: The original time value to be smeared (for the first method).
+- `hit::HitCoordinate`: The original hit coordinate with time to be smeared (for the second method).
 
 # Returns
-- `Float64`: The smeared time value.
+- `Float64`: The smeared time value (for the first method).
+- `HitCoordinate`: A new `HitCoordinate` with smeared time (for the second method).
 """
 function smear_time(cdt::ChargeDepositTester, time::Float64)::Float64
     # Apply Gaussian smearing to the time
@@ -295,20 +311,6 @@ function smear_time(cdt::ChargeDepositTester, time::Float64)::Float64
     return smeared_time
 end
 
-"""
-Applies Gaussian smearing to the time component of a hit coordinate.
-
-Preserves the spatial coordinates while applying time smearing.
-Creates a new HitCoordinate object rather than modifying the original.
-Time smearing follows a Gaussian distribution with width determined by the detector's time resolution.
-
-# Arguments
-- `cdt::ChargeDepositTester`: The charge deposit tester configuration.
-- `hit::HitCoordinate`: The original hit coordinate with time to be smeared.
-
-# Returns
-- `HitCoordinate`: A new hit coordinate with the same position but smeared time.
-"""
 function smear_time(cdt::ChargeDepositTester, hit::HitCoordinate)::HitCoordinate
     # Apply Gaussian smearing to the time
     smeared_time = hit.time + randn() * cdt.resolution

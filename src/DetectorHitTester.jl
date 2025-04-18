@@ -1,5 +1,13 @@
 """
-    DetectorHitTester
+    DetectorHitTester(
+        scaleFactor::Float64=1.0,
+        emin::Float64=1.75,
+        emax::Float64=7.00,
+        implement_epotek_cutoff::Bool=true,
+        implement_imperfect_mirror::Bool=true,
+        implement_QE::Bool=true,
+        implement_CE::Bool=true,
+    )
 
 Type representing the configuration for photon detection efficiency testing with adjustable parameters.
 Combines multiple effects such as quantum efficiency, collection efficiency, and mirror reflectivity.
