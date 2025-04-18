@@ -1,5 +1,21 @@
 """
-Represents a test beam simulator configuration for particle generation.
+    TestBeamSimulator(
+        entryX::Float64=100.0,
+        entryY::Float64=100.0,
+        sigmaEntryX::Float64=1.0,
+        sigmaEntryY::Float64=1.0,
+        momentumMean::Float64=5.0,
+        momentumSigma::Float64=0.005,
+        thetaMean::Float64=-0.001,
+        thetaSigma::Float64=0.0002,
+        phiMean::Float64=-0.001,
+        phiSigma::Float64=0.0002,
+        timingDistance::Float64=8000.0,
+        timingResolution::Float64=0.015,
+        pid::Int64=2212,
+    )
+
+Type epresenting a test beam simulator configuration for particle generation.
 
 # Fields
 - `entryX::Float64`: X-coordinate of the beam entry point.
@@ -15,6 +31,50 @@ Represents a test beam simulator configuration for particle generation.
 - `timingDistance::Float64`: Distance from timing reference.
 - `timingResolution::Float64`: Resolution of the timing measurement.
 - `pid::Int64`: Particle ID code.
+
+# Constructors
+
+    TestBeamSimulator(
+        entryX::Float64=100.0,
+        entryY::Float64=100.0,
+        sigmaEntryX::Float64=1.0,
+        sigmaEntryY::Float64=1.0,
+        momentumMean::Float64=5.0,
+        momentumSigma::Float64=0.005,
+        thetaMean::Float64=-0.001,
+        thetaSigma::Float64=0.0002,
+        phiMean::Float64=-0.001,
+        phiSigma::Float64=0.0002,
+        timingDistance::Float64=8000.0,
+        timingResolution::Float64=0.015,
+        pid::Int64=2212,
+    )
+
+Constructs a TestBeamSimulator with default or specified parameters.
+
+## Keywords
+- `entryX::Float64`: X-coordinate of the beam entry point. Default: 100.0.
+- `entryY::Float64`: Y-coordinate of the beam entry point. Default: 100.0.
+- `sigmaEntryX::Float64`: Standard deviation of the beam entry point in X. Default: 1.0.
+- `sigmaEntryY::Float64`: Standard deviation of the beam entry point in Y. Default: 1.0.
+- `momentumMean::Float64`: Mean momentum of the beam particles. Default: 5.0.
+- `momentumSigma::Float64`: Standard deviation of the beam momentum. Default: 0.005.
+- `thetaMean::Float64`: Mean theta angle of the beam direction. Default: -0.001.
+- `thetaSigma::Float64`: Standard deviation of the theta angle. Default: 0.0002.
+- `phiMean::Float64`: Mean phi angle of the beam direction. Default: -0.001.
+- `phiSigma::Float64`: Standard deviation of the phi angle. Default: 0.0002.
+- `timingDistance::Float64`: Distance from timing reference. Default: 8000.0.
+- `timingResolution::Float64`: Resolution of the timing measurement. Default: 0.015.
+- `pid::Int64`: Particle ID code. Default: 2212 (proton).
+
+    TestBeamSimulator(config_file::String)
+    
+Constructs a TestBeamSimulator from a YAML configuration file.
+The configuration file should contain sections for entry, beam, timingRef, and particle parameters.
+Default values are used for any parameters not specified in the configuration file.
+
+## Arguments
+- `config_file::String`: Path to the YAML configuration file.
 """
 struct TestBeamSimulator
     entryX::Float64
@@ -39,27 +99,6 @@ struct TestBeamSimulator
     pid::Int64
 end
 
-"""
-Constructs a TestBeamSimulator with default or specified parameters.
-
-# Arguments
-- `entryX::Float64`: X-coordinate of the beam entry point. Default: 100.0.
-- `entryY::Float64`: Y-coordinate of the beam entry point. Default: 100.0.
-- `sigmaEntryX::Float64`: Standard deviation of the beam entry point in X. Default: 1.0.
-- `sigmaEntryY::Float64`: Standard deviation of the beam entry point in Y. Default: 1.0.
-- `momentumMean::Float64`: Mean momentum of the beam particles. Default: 5.0.
-- `momentumSigma::Float64`: Standard deviation of the beam momentum. Default: 0.005.
-- `thetaMean::Float64`: Mean theta angle of the beam direction. Default: -0.001.
-- `thetaSigma::Float64`: Standard deviation of the theta angle. Default: 0.0002.
-- `phiMean::Float64`: Mean phi angle of the beam direction. Default: -0.001.
-- `phiSigma::Float64`: Standard deviation of the phi angle. Default: 0.0002.
-- `timingDistance::Float64`: Distance from timing reference. Default: 8000.0.
-- `timingResolution::Float64`: Resolution of the timing measurement. Default: 0.015.
-- `pid::Int64`: Particle ID code. Default: 2212 (proton).
-
-# Returns
-- `TestBeamSimulator`: A configured test beam simulator instance.
-"""
 function TestBeamSimulator(;
     entryX::Float64 = 100.0,
     entryY::Float64 = 100.0,
@@ -92,18 +131,6 @@ function TestBeamSimulator(;
     )
 end
 
-"""
-Constructs a TestBeamSimulator from a YAML configuration file.
-
-The configuration file should contain sections for entry, beam, timingRef, and particle parameters.
-Default values are used for any parameters not specified in the configuration file.
-
-# Arguments
-- `config_file::String`: Path to the YAML configuration file.
-
-# Returns
-- `TestBeamSimulator`: A test beam simulator instance configured according to the file.
-"""
 function TestBeamSimulator(config_file::String)
     config = YAML.load_file(config_file)
     TestBeamSimulator(
@@ -124,7 +151,15 @@ function TestBeamSimulator(config_file::String)
 end
 
 """
-Represents a particle in a test beam experiment.
+    TestBeamParticle(
+        particle::Particle,
+        energy::Float64,
+        beta::Float64,
+        timingPosition::Tuple{Float64,Float64},
+        flightTime::Float64,
+    )
+
+Type storing the particle information from a simulated test beam event.
 
 # Fields
 - `particle::Particle`: The base particle object.
@@ -142,7 +177,18 @@ struct TestBeamParticle
 end
 
 """
-Stores the photon detection results from a test beam event.
+    TestBeamPhotons(
+        photon_yield::Int,
+        npixels::Int,
+        xpixels::Vector{Float64},
+        ypixels::Vector{Float64},
+        tpixels::Vector{Float64},
+        mcps::Vector{Int},
+        mcpcolums::Vector{Int},
+        charge::Vector{Float64},
+    )
+
+Type storing the photon detection results from a simulated test beam event.
 
 # Fields
 - `photon_yield::Int`: Total number of photons generated.
@@ -166,7 +212,13 @@ struct TestBeamPhotons
 end
 
 """
-Contains all data for a single test beam event.
+    TestBeamData(
+        eventNumber::Int,
+        particle::TestBeamParticle,
+        photons::TestBeamPhotons,
+    )
+
+Type storing the data for a single test beam event.
 
 # Fields
 - `eventNumber::Int`: Sequential identifier for the event.
@@ -180,21 +232,20 @@ struct TestBeamData
 end
 
 """
-Generates a simulated particle according to the beam configuration.
+    generate_particle(tb::TestBeamSimulator)::TestBeamParticle
 
-Entry position is randomized according to a Normal distribution with means `entryX` and `entryY`
-and standard deviations `sigmaEntryX` and `sigmaEntryY`.
-Momentum is randomized according to a Normal distribution with mean `momentumMean`
-and standard deviation `momentumSigma`.
-Direction angles are randomized according to Normal distributions with means `thetaMean` and `phiMean`
-and standard deviations `thetaSigma` and `phiSigma`.
-The timing reference and flight time are calculated based on the `timingDistance` parameter.
+`generate_particle` simulates a particle based on the beam configuration. 
+The entry position is sampled from a normal distribution with means `entryX` and `entryY` and standard deviations `sigmaEntryX` and `sigmaEntryY`. 
+The momentum is sampled from a normal distribution with mean `momentumMean` and standard deviation `momentumSigma`. 
+Direction angles (`theta` and `phi`) are also sampled from normal distributions with means `thetaMean` and `phiMean` 
+and standard deviations `thetaSigma` and `phiSigma`. 
+The timing reference position and flight time are calculated using the `timingDistance` parameter, accounting for the particle's velocity and path length.
 
 # Arguments
 - `tb::TestBeamSimulator`: Test beam simulator configuration.
 
 # Returns
-- `TestBeamParticle`: A simulated particle with randomized properties according to the beam configuration.
+- `TestBeamParticle`: A simulated test beam particle.
 """
 function generate_particle(tb::TestBeamSimulator)::TestBeamParticle
     # Generate the entry point using Normal distribution
@@ -202,7 +253,7 @@ function generate_particle(tb::TestBeamSimulator)::TestBeamParticle
     entryY = tb.entryY + tb.sigmaEntryY * randn()
 
     entryX -= RADIATOR.half_width
-    entryY -= 0.5 * RADIATOR.height / 2.0
+    entryY -= 0.5 * RADIATOR.height
 
     # Generate the momentum
     momentum = tb.momentumMean + tb.momentumSigma * randn()
@@ -242,19 +293,25 @@ function generate_particle(tb::TestBeamSimulator)::TestBeamParticle
         pathlength = pathlength,
         t0 = t0,
     )
-    initRotation(particle)
+    initial_rotation!(particle)
 
     TestBeamParticle(particle, energy, beta, (timingPositionX, timingPositionY), flightTime)
 end
 
 """
-Generates and processes photons from a particle interaction.
+    generate_photons(
+        particle::TestBeamParticle,
+        spectrum::PhotonSpectrum,
+        mapper::PhotonMapper,
+        fe::FrontEnd,
+        cdt::ChargeDepositTester,
+    )::Union{Nothing,TestBeamPhotons}
 
-First generates photons according to the spectrum and the particle's beta.
-Projects the photon pattern using the provided mapper.
-Creates MCP images and adds photon hits to them.
-Extracts hits from the MCP images according to the front-end configuration.
-Returns `nothing` if no valid pixel hits were found.
+`generate_photons` simulates and processes photons resulting from a particle interaction. 
+It first calculates the photon yield based on the particle's beta and the provided spectrum. 
+The photon pattern is then projected using the mapper, and photon hits are added to MCP images. 
+Hits are extracted from the MCP images based on the front-end configuration. 
+If no valid pixel hits are detected, the function returns `nothing`.
 
 # Arguments
 - `particle::TestBeamParticle`: The particle generating the photons.
@@ -279,12 +336,12 @@ function generate_photons(
     photons = project_pattern(
         particle.particle,
         particle.beta,
+        mapper,
         spectrum,
         photon_distribution,
-        mapper,
     )
     photon_yield = length(photons)
-    println("Photon yield: ", photon_yield)
+    #println("Photon yield: ", photon_yield)
     #npixels = length(photons)
     #xpixels = Vector{Float64}(undef, npixels)
     #ypixels = Vector{Float64}(undef, npixels)
@@ -294,7 +351,6 @@ function generate_photons(
     #end
 
     mcp_images = create_mcp_images(fe)
-    #println("MCP images created ", size(mcp_images[begin].pixelmap[begin]))
     for photon in photons
         add_photon!(mcp_images, fe, cdt, photon)
     end
@@ -319,19 +375,10 @@ function generate_photons(
         push!(ypixels, pixel.y)
         push!(tpixels, pixel.t)
 
-        push!(mcp, pixel.x / fe.n_xpixels)
+        push!(mcp, pixel.x ÷ fe.n_xpixels)
         push!(mcpcolum, pixel.x % fe.n_xpixels)
-        push!(charge, pixel.charge)
+        push!(charge, pixel.ch)
     end
 
-    TestBeamPhotons(
-        photon_yield,
-        npixels,
-        xpixels,
-        ypixels,
-        tpixels,
-        mcps,
-        mcpcolums,
-        charge,
-    )
+    TestBeamPhotons(photon_yield, npixels, xpixels, ypixels, tpixels, mcp, mcpcolum, charge)
 end
