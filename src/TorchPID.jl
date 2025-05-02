@@ -18,7 +18,8 @@ export PhotonMapper, trace_photon
 export project_pattern
 export ChargeDepositTester, charge_over_threshold, get_charge, get_smeared_time, smear_time
 export FrontEnd, create_mcp_images, add_photon!, reset!, get_hits
-export TestBeamSimulator, TestBeamData, generate_particle, generate_photons
+export TestBeamSimulator,
+    TestBeamParticle, TestBeamPhotons, generate_particle, generate_photons
 # export EventReader, get_particle, photon_columns, track_columns
 # export PIDAlgorithm, findHitCoordinates, runAlgorithm
 
