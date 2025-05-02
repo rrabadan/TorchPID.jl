@@ -212,26 +212,6 @@ struct TestBeamPhotons
 end
 
 """
-    TestBeamData(
-        eventNumber::Int,
-        particle::TestBeamParticle,
-        photons::TestBeamPhotons,
-    )
-
-Type storing the data for a single test beam event.
-
-# Fields
-- `eventNumber::Int`: Sequential identifier for the event.
-- `particle::TestBeamParticle`: The particle that generated the event.
-- `photons::TestBeamPhotons`: Photon detection results for the event.
-"""
-struct TestBeamData
-    eventNumber::Int
-    particle::TestBeamParticle
-    photons::TestBeamPhotons
-end
-
-"""
     generate_particle(tb::TestBeamSimulator)::TestBeamParticle
 
 `generate_particle` simulates a particle based on the beam configuration. 
@@ -279,19 +259,23 @@ function generate_particle(tb::TestBeamSimulator)::TestBeamParticle
 
     t0 = tb.timingResolution == 0 ? 0 : tb.timingResolution * randn()
 
+    xDir = px / momentum
+    yDir = py / momentum
+    zDir = pz / momentum
+
     particle = Particle(
-        pid = tb.pid,
-        xCoord = entryX,
-        yCoord = entryY,
-        pMag = momentum,
-        xDir = px / momentum,
-        yDir = py / momentum,
-        zDir = pz / momentum,
-        recoPX = px,
-        recoPY = py,
-        recoPZ = pz,
-        pathlength = pathlength,
-        t0 = t0,
+        tb.pid,
+        entryX,
+        entryY,
+        momentum,
+        xDir,
+        yDir,
+        zDir,
+        px,
+        py,
+        pz,
+        pathlength,
+        t0,
     )
     initial_rotation!(particle)
 

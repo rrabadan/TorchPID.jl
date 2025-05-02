@@ -135,6 +135,50 @@ function Particle(;
     )
 end
 
+function Particle(
+    pid::Int,
+    xCoord::Float64,
+    yCoord::Float64,
+    pMag::Float64,
+    xDir::Float64,
+    yDir::Float64,
+    zDir::Float64,
+    recoPX::Float64,
+    recoPY::Float64,
+    recoPZ::Float64,
+    pathlength::Float64,
+    t0::Float64,
+)
+    eventId::Int = 0
+    trackId::Int = 0
+    moduleId::Int = 0
+    rotMatrix::Array{Float64,2} = Array{Float64,2}([1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0])
+
+    Particle(
+        pid,
+        eventId,
+        trackId,
+        moduleId,
+        xCoord,
+        yCoord,
+        pMag,
+        pMag,
+        xDir,
+        yDir,
+        zDir,
+        recoPX,
+        recoPY,
+        recoPZ,
+        recoPX,
+        recoPY,
+        recoPZ,
+        pathlength,
+        pathlength,
+        t0,
+        rotMatrix,
+    )
+end
+
 """
     particle_beta(p, m)
 
