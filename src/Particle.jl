@@ -1,5 +1,5 @@
 """
-    Partcle(pid, eventId, trackId, moduleId, xCoord, yCoord, pMag, pMagTrue,
+    Partcle(pid, trackId, moduleId, xCoord, yCoord, pMag, pMagTrue,
             xDir, yDir, zDir, truePX, truePY, truePZ, recoPX, recoPY, recoPZ,
             pathlength, truePathlength, t0, rotMatrix)
 
@@ -10,7 +10,6 @@ The rotation matrix facilitates coordinate transformations between the particle'
 
 # Fields
 - `pid::Int`: Particle identification code (e.g., PDG ID).
-- `eventId::Int`: Identifier for the event the particle belongs to.
 - `trackId::Int`: Identifier for the particle's reconstructed track.
 - `moduleId::Int`: Identifier for the detector module where the particle was detected.
 - `xCoord::Float64`: x-coordinate of the particle's position.
@@ -33,7 +32,6 @@ The rotation matrix facilitates coordinate transformations between the particle'
 """
 struct Particle
     pid::Int
-    eventId::Int
     trackId::Int
     moduleId::Int
     xCoord::Float64
@@ -63,7 +61,6 @@ The default rotation matrix is the identity matrix, representing no rotation.
 
 # Arguments
 - `pid::Int=211`: Particle identification code (default: 211, pion).
-- `eventId::Int=0`: Identifier for the event the particle belongs to.
 - `trackId::Int=0`: Identifier for the particle's reconstructed track.
 - `moduleId::Int=0`: Identifier for the detector module.
 - `xCoord::Float64=0.0`: X-coordinate of the particle's position.
@@ -89,7 +86,6 @@ The default rotation matrix is the identity matrix, representing no rotation.
 """
 function Particle(;
     pid::Int = 211,
-    eventId::Int = 0,
     trackId::Int = 0,
     moduleId::Int = 0,
     xCoord::Float64 = 0.0,
@@ -149,14 +145,12 @@ function Particle(
     pathlength::Float64,
     t0::Float64,
 )
-    eventId::Int = 0
     trackId::Int = 0
     moduleId::Int = 0
     rotMatrix::Array{Float64,2} = Array{Float64,2}([1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0])
 
     Particle(
         pid,
-        eventId,
         trackId,
         moduleId,
         xCoord,
