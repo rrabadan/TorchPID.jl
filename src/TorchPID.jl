@@ -4,6 +4,7 @@ using Random
 using YAML
 using UnROOT
 using Distributions
+using Base.Threads
 
 export RADIATOR, WEDGE, FOCUS, DETECTOR, MASK, SIGNAL
 export HitCoordinate, PixelHit
@@ -20,8 +21,9 @@ export ChargeDepositTester, charge_over_threshold, get_charge, get_smeared_time,
 export FrontEnd, create_mcp_images, add_photon!, reset!, get_hits
 export TestBeamSimulator,
     TestBeamParticle, TestBeamPhotons, generate_particle, generate_photons
-# export EventReader, get_particle, photon_columns, track_columns
-# export PIDAlgorithm, findHitCoordinates, runAlgorithm
+export PhotonHit, update_photon_hit!
+export create_event_reader,
+    get_event_data, event_iterator, get_particles_in_event, get_hits_in_event
 
 include("PhysicsConstants.jl")
 include("GeometryConstants.jl")
@@ -37,7 +39,7 @@ include("PixelMapper.jl")
 include("ChargeDepositTester.jl")
 include("FrontEnd.jl")
 include("TestBeam.jl")
-#include("EventReader.jl")
-#include("PIDAlgorithm.jl")
+include("PhotonHit.jl")
+include("EventReader.jl")
 
 end # module TorchPID
