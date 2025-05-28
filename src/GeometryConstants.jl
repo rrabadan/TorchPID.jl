@@ -39,6 +39,7 @@ struct Radiator
     height::Float64
     width::Float64
     depth::Float64
+    half_height::Float64
     half_width::Float64
 end
 
@@ -54,7 +55,7 @@ Constructs a `Radiator` instance.
 - `Radiator`: An instance of the `Radiator` struct.
 """
 function Radiator(; height::Float64 = 2500.0, width::Float64 = 660.0, depth::Float64 = 10.0)
-    Radiator(height, width, depth, width / 2)
+    Radiator(height, width, depth, height / 2, width / 2)
 end
 
 """
@@ -67,7 +68,6 @@ Struct representing the TORCH's Wedge geometry.
 - `tan_theta::Float64`: The tangent of the angle `theta` for optimization.
 - `offset::Float64`: Offset value calculated as radiator depth divided by tangent of `theta`.
 
-The wedge is a critical component directing photons from the radiator to the focusing optics.
 Trigonometric values are pre-calculated for computational efficiency.
 """
 struct Wedge
@@ -410,6 +410,51 @@ function SignalParameters(;
     )
 end
 
+"""
+A struct combining all TORCH detector geometry components for convenient access.
+
+# Fields
+- `radiator::Radiator`: The quartz plate where Cherenkov photons are generated
+- `wedge::Wedge`: The focusing block that directs photons
+- `focus::Focus`: The focusing optics configuration
+- `detector::Detector`: The MCP-PMT photon detector array
+- `mask::Mask`: Optional masking geometry
+- `signal::SignalParameters`: Electronic signal detection parameters
+"""
+struct Geometry
+    radiator::Radiator
+    wedge::Wedge
+    focus::Focus
+    detector::Detector
+    mask::Mask
+    signal::SignalParameters
+end
+
+"""
+Constructs a `Geometry` instance with default or provided component instances.
+
+# Arguments
+- `radiator::Radiator`: The radiator geometry (default: constructed with default parameters)
+- `wedge::Wedge`: The wedge geometry (default: constructed based on radiator)
+- `focus::Focus`: The focusing optics (default: constructed based on radiator and wedge)
+- `detector::Detector`: The detector configuration (default: constructed based on radiator and wedge)
+- `mask::Mask`: The masking geometry (default: constructed with default parameters)
+- `signal::SignalParameters`: The signal parameters (default: constructed with default parameters)
+
+# Returns
+- `Geometry`: An instance containing all TORCH geometry components
+"""
+function Geometry(;
+    radiator::Radiator = Radiator(),
+    wedge::Wedge = Wedge(radiator),
+    focus::Focus = Focus(radiator, wedge),
+    detector::Detector = Detector(radiator, wedge),
+    mask::Mask = Mask(),
+    signal::SignalParameters = SignalParameters(),
+)
+    Geometry(radiator, wedge, focus, detector, mask, signal)
+end
+
 # Create instances of the structs and export them
 RADIATOR = Radiator(height = 2500.0, width = 660.0, depth = 10.0)
 WEDGE = Wedge(RADIATOR)
@@ -418,35 +463,12 @@ DETECTOR = Detector(RADIATOR, WEDGE)
 MASK = Mask()
 SIGNAL = SignalParameters()
 
-"""
-Determines if a photon originates from the focus region.
-
-# Arguments
-- `yemission::Float64`: The y-coordinate of the photon's emission.
-
-# Returns
-- `Bool`: `true` if the photon originates from the focus region, `false` otherwise.
-"""
-function photon_from_focus(yemission)
-    radiator_top = 0.5 * RADIATOR.height - WEDGE.height
-    return yemission > radiator_top
-end
-
-"""
-Checks if a photon hits the detector.
-
-# Arguments
-- `x::Float64`: The x-coordinate of the photon.
-- `y::Float64`: The y-coordinate of the photon.
-
-# Returns
-- `Bool`: `true` if the photon hits the detector, `false` otherwise.
-"""
-function photon_on_detector(x, y)
-    return (
-        y > DETECTOR.y_min &&
-        y < DETECTOR.y_max &&
-        x > DETECTOR.x_min &&
-        x < DETECTOR.x_max
-    )
-end
+# Create a single GEOMETRY object that contains all components
+GEOMETRY = Geometry(
+    radiator = RADIATOR,
+    wedge = WEDGE,
+    focus = FOCUS,
+    detector = DETECTOR,
+    mask = MASK,
+    signal = SIGNAL,
+)
