@@ -66,22 +66,17 @@ function hits_branches(; debug = false)
         "LocalZ",
         "ArrivalTime",
         "Energy",
+        "EmissionX",
+        "EmissionY",
+        "EmissionZ",
+        "EmissionTime",
         "Module",
         "Track",
         "IsDownward",
         "IsSurfaceScattered",
         "IsRayleighScattered",
     ]
-    return debug ?
-           vcat(
-        br,
-        "CherenkovTheta",
-        "CherenkovPhi",
-        "EmissionX",
-        "EmissionY",
-        "EmissionZ",
-        "EmissionTime",
-    ) : br
+    return debug ? vcat(br, "CherenkovTheta", "CherenkovPhi") : br
 end
 
 """
@@ -246,7 +241,22 @@ function EventReader(
 
     HitPool = ObjPool{PhotonHit}(maximum(hit_counts))
     for i = 1:maximum(hit_counts)
-        HitPool.data[i] = PhotonHit(0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, false, false, false)
+        HitPool.data[i] = PhotonHit(
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0,
+            0,
+            false,
+            false,
+            false,
+        )
     end
 
     return EventReader(
