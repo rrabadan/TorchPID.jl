@@ -6,7 +6,7 @@ using UnROOT
 using Distributions
 using Base.Threads
 
-export RADIATOR, WEDGE, FOCUS, DETECTOR, MASK, SIGNAL
+export GEOMETRY, RADIATOR, WEDGE, FOCUS, DETECTOR, MASK, SIGNAL
 export HitCoordinate, PixelHit
 export DetectorHitTester, photon_efficiency, test_photon
 export PhotonSpectrum, PhotonSpectrumDistribution
@@ -21,9 +21,15 @@ export ChargeDepositTester, charge_over_threshold, get_charge, get_smeared_time,
 export FrontEnd, create_mcp_images, add_photon!, reset!, get_hits
 export TestBeamSimulator,
     TestBeamParticle, TestBeamPhotons, generate_particle, generate_photons
-export PhotonHit, update_photon_hit!
+export PhotonHit,
+    update_photon_hit!,
+    photon_from_radiator,
+    photon_from_focus,
+    photon_on_detector,
+    is_photon_masked
 export create_event_reader,
     get_event_data, event_iterator, get_particles_in_event, get_hits_in_event
+export PIDAlg, run_algorithm
 
 include("PhysicsConstants.jl")
 include("GeometryConstants.jl")
@@ -41,5 +47,6 @@ include("FrontEnd.jl")
 include("TestBeam.jl")
 include("PhotonHit.jl")
 include("EventReader.jl")
+include("PIDAlgorithm.jl")
 
 end # module TorchPID
