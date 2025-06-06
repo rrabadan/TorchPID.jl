@@ -24,6 +24,7 @@ function project_pattern(
     mapper::PhotonMapper,
     spectrum::PhotonSpectrum,
     distribution::PhotonSpectrumDistribution,
+    factory::PhotonFactory,
 )::Vector{HitCoordinate}
     hits = HitCoordinate[]
 
@@ -31,7 +32,7 @@ function project_pattern(
         return hits
     end
 
-    pathlength = RADIATOR.depth / particle.zDir
+    pathlength = factory.radiator.depth / particle.zDir
     photonYield = spectrum_yield(distribution, pathlength)
 
     # Poisson distribution
@@ -42,7 +43,7 @@ function project_pattern(
         n_phase = nphase_Corning(energy)
         n_group = ngroup_Corning(energy)
 
-        photon = Photon(particle, beta, n_phase, n_group, energy)
+        photon = create_random_photon(factory, particle, beta, n_phase, n_group, energy)
 
         # Calculate the time offset
         time_offset = _get_time_offset(particle, beta, photon.zpos)
@@ -63,9 +64,10 @@ function project_pattern(
     beta::Float64,
     mapper::PhotonMapper,
     spectrum::PhotonSpectrum,
+    factory::PhotonFactory,
 )::Vector{HitCoordinate}
     photonDistribution = PhotonSpectrumDistribution(spectrum, particle, beta)
-    return project_pattern(particle, beta, mapper, spectrum, photonDistribution)
+    return project_pattern(particle, beta, mapper, spectrum, photonDistribution, factory)
 end
 
 """
