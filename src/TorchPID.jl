@@ -5,7 +5,9 @@ using YAML
 using UnROOT
 using Distributions
 using Base.Threads
+using StaticArrays
 
+export CONSTANTS
 export GEOMETRY, RADIATOR, WEDGE, FOCUS, DETECTOR, MASK, SIGNAL
 export HitCoordinate, PixelHit
 export DetectorHitTester, photon_efficiency, test_photon
@@ -14,7 +16,12 @@ export spectrum_nphase, spectrum_ngroup
 export spectrum_yield, spectrum_random_energy, spectrum_probability
 export Particle, particle_beta, particle_gamma, initial_rotation!, rotate, get_particle_mass
 export PARTICLE_PROPERTIES
-export Photon, test_z_surface_roughness, in_focus_acceptance
+export Photon,
+    PhotonFactory,
+    create_random_photon,
+    create_explicit_photon,
+    test_z_surface_roughness,
+    in_focus_acceptance
 export PhotonMapper, trace_photon
 export project_pattern
 export ChargeDepositTester, charge_over_threshold, get_charge, get_smeared_time, smear_time
