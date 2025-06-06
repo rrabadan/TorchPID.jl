@@ -227,13 +227,17 @@ The timing reference position and flight time are calculated using the `timingDi
 # Returns
 - `TestBeamParticle`: A simulated test beam particle.
 """
-function generate_particle(tb::TestBeamSimulator)::TestBeamParticle
+function generate_particle(
+    tb::TestBeamSimulator,
+    radiator::Radiator,
+    constants::Constants,
+)::TestBeamParticle
     # Generate the entry point using Normal distribution
     entryX = tb.entryX + tb.sigmaEntryX * randn()
     entryY = tb.entryY + tb.sigmaEntryY * randn()
 
-    entryX -= RADIATOR.half_width
-    entryY -= 0.5 * RADIATOR.height
+    entryX -= radiator.half_width
+    entryY -= 0.5 * radiator.height
 
     # Generate the momentum
     momentum = tb.momentumMean + tb.momentumSigma * randn()
@@ -252,7 +256,7 @@ function generate_particle(tb::TestBeamSimulator)::TestBeamParticle
     pz = momentum * cos(theta)
 
     pathlength = tb.timingDistance / cos(theta)
-    flightTime = pathlength / (beta * CLIGHT)
+    flightTime = pathlength / (beta * constants.CLIGHT)
 
     timingPositionX = entryX - pathlength * cos(phi) * sin(theta)
     timingPositionY = entryY - pathlength * sin(phi) * sin(theta)
@@ -311,6 +315,7 @@ function generate_photons(
     particle::TestBeamParticle,
     spectrum::PhotonSpectrum,
     mapper::PhotonMapper,
+    factory::PhotonFactory,
     fe::FrontEnd,
     cdt::ChargeDepositTester,
 )::Union{Nothing,TestBeamPhotons}
@@ -323,6 +328,7 @@ function generate_photons(
         mapper,
         spectrum,
         photon_distribution,
+        factory,
     )
     photon_yield = length(photons)
     #println("Photon yield: ", photon_yield)
