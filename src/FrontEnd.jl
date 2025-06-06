@@ -334,20 +334,30 @@ struct FrontEnd
     n_ypixels::Int
     n_tpixels::Int
     n_deadtime::Int
+    x_size::Float64
+    y_size::Float64
+    active::Float64
     sharing_mode::Bool
     smear_time::Bool
 end
 
-function FrontEnd(;
-    n_mcps::Int = DETECTOR.n_detectors,
-    n_xpixels::Int = DETECTOR.n_xpixels,
-    n_ypixels::Int = DETECTOR.n_ypixels,
-    n_tpixels::Int = DETECTOR.n_tpixels,
-    n_deadtime::Int = DETECTOR.n_deadtime,
+function FrontEnd(
+    detector::Detector;
     sharing_mode::Bool = false,
     smear_time::Bool = false,
 )::FrontEnd
-    FrontEnd(n_mcps, n_xpixels, n_ypixels, n_tpixels, n_deadtime, sharing_mode, smear_time)
+    FrontEnd(
+        detector.n_detectors,
+        detector.n_xpixels,
+        detector.n_ypixels,
+        detector.n_tpixels,
+        detector.n_deadtime,
+        detector.x_size,
+        detector.y_size,
+        detector.active,
+        sharing_mode,
+        smear_time,
+    )
 end
 
 """
@@ -369,8 +379,12 @@ For each MCP detector specified in the front-end configuration, it creates an MC
 """
 function create_mcp_images(fe::FrontEnd)::MCPImageArray
     mcpimages = Vector{MCPImage}(undef, fe.n_mcps)
+    n_xpixels = fe.n_xpixels
+    n_ypixels = fe.n_ypixels
+    n_tpixels = fe.n_tpixels
+    n_deadtime = fe.n_deadtime
     for i = 1:fe.n_mcps
-        mcpimages[i] = MCPImage(fe.n_xpixels, fe.n_ypixels, fe.n_tpixels, fe.n_deadtime)
+        mcpimages[i] = MCPImage(n_xpixels, n_ypixels, n_tpixels, n_deadtime)
     end
     return mcpimages
 end
@@ -399,6 +413,7 @@ function find_pixels(
     xpos::Float64,
     ypos::Float64,
 )::Union{Nothing,Vector{PixelHit}}
+
     mcp = get_mcp_number(xpos)
     xcentre = get_mcp_xpixel(xpos)
     ycentre = get_ypixel(ypos)
@@ -428,34 +443,39 @@ function find_pixels(
     pixels = Vector{PixelHit}(undef, max_pixels)
     pixel_count = 0
 
+    active = fe.active
+    x_size = fe.x_size
+    y_size = fe.y_size
+    n_xpixels = fe.n_xpixels
+    smear_time = fe.smear_time
     # Loop over pixels in the defined ranges.
     @inbounds for ix = ix_low:ix_upp
         @inbounds for iy = iy_low:iy_upp
             # Compute the lower boundaries for this pixel.
-            xlow = ix * DETECTOR.x_size
-            ylow = iy * DETECTOR.y_size
+            xlow = ix * x_size
+            ylow = iy * y_size
 
             @fastmath begin
                 # Shift the boundaries by subtracting half the active area.
-                xlow -= 0.5 * DETECTOR.active
-                ylow -= 0.5 * DETECTOR.active
+                xlow -= 0.5 * active
+                ylow -= 0.5 * active
 
                 # Compute the upper boundaries.
-                xupp = xlow + DETECTOR.x_size
-                yupp = ylow + DETECTOR.y_size
+                xupp = xlow + x_size
+                yupp = ylow + y_size
             end
 
             # Check if the charge is over threshold.
             if charge_over_threshold(cdt, xval, xlow, xupp, ypos, ylow, yupp)
                 # Each hit is smeared independently.
-                tprime = fe.smear_time ? smear_time(cdt, time) : time
+                tprime = smear_time ? smear_time(cdt, time) : time
 
                 # Get the time pixel (without bounds checking).
                 tpixel = get_tpixel_noheck(tprime)
 
                 # Compute the x-pixel in the module pixel coordinate system.
                 # (Assuming 'MCP' and Geometry.Detector.n_xpixels are defined.)
-                xpixel = mcp * DETECTOR.n_xpixels + ix
+                xpixel = mcp * n_xpixels + ix
 
                 # Get the charge value.
                 charge = get_charge(cdt, xval, xlow, xupp, ypos, ylow, yupp)
