@@ -83,7 +83,8 @@ function main()
     tb_simulator = TestBeamSimulator()
     photon_spectrum = PhotonSpectrum()
     photon_mapper = PhotonMapper()
-    frontend = FrontEnd()
+    photon_factory = PhotonFactory(RADIATOR, CONSTANTS)
+    frontend = FrontEnd(DETECTOR)
     charge_tester = ChargeDepositTester()
 
     # Initialize progress counter
@@ -100,11 +101,16 @@ function main()
     # Process events sequentially
     for event = 1:events
 
-        tb_particle = generate_particle(tb_simulator)
+        tb_particle = generate_particle(
+            tb_simulator,
+            photon_factory.radiator,
+            photon_factory.constants,
+        )
         tb_photons = generate_photons(
             tb_particle,
             photon_spectrum,
             photon_mapper,
+            photon_factory,
             frontend,
             charge_tester,
         )
