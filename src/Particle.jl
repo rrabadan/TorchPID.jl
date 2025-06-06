@@ -50,7 +50,7 @@ struct Particle
     pathlength::Float64
     truePathlength::Float64
     t0::Float64
-    rotMatrix::Array{Float64,2}
+    rotMatrix::MMatrix{3,3,Float64,9}
 end
 
 """
@@ -104,7 +104,17 @@ function Particle(;
     pathlength::Float64 = 0.0,
     truePathlength::Float64 = 0.0,
     t0::Float64 = 0.0,
-    rotMatrix::Array{Float64,2} = Array{Float64,2}([1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0]),
+    rotMatrix::MMatrix{3,3,Float64,9} = MMatrix{3,3,Float64,9}(
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+    ),
 )
     Particle(
         pid,
@@ -147,7 +157,8 @@ function Particle(
 )
     trackId::Int = 0
     moduleId::Int = 0
-    rotMatrix::Array{Float64,2} = Array{Float64,2}([1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0])
+    rotMatrix::MMatrix{3,3,Float64,9} =
+        MMatrix{3,3,Float64,9}(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
 
     Particle(
         pid,
@@ -338,7 +349,7 @@ function get_type_and_properties(p::Particle)
             return k, v
         end
     end
-    return UNKNOWN, ParticleProperties(0.0, 0)
+    return UNKNOWN, ParticleProperty("unknown", 0.0, 0)
 end
 
 """ 
