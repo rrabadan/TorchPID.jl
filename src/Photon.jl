@@ -23,25 +23,6 @@ Position coordinates are in millimeters (mm).
 - `is_y_reflected::Bool`: Flag indicating reflection status in y-direction.
 - `is_z_reflected::Bool`: Flag indicating reflection status in z-direction.
 
-# Constructors
-    Photon(p, beta, nphase, ngroup, energy)
-
-Creates a Photon instance by determining its direction, emission point, and reflection flags based on the particle's properties, photon energy, and refractive indices. 
-The Cherenkov angle is calculated using the particle's velocity and the phase refractive index. 
-A random azimuthal angle (phi) is uniformly sampled between 0 and 2π to simulate isotropic emission. 
-The emission point is randomly chosen along the radiator depth to reflect realistic photon production. 
-Reflection flags are set by comparing the photon's direction with the critical angle for total internal reflection. 
-Surface roughness effects are excluded from this constructor and are handled separately.
-
-## Arguments
-- `p::Particle`: The particle instance emitting the photon.
-- `beta::Float64`: The velocity factor of the particle (v/c).
-- `nphase::Float64`: The phase refractive index for the specific photon energy.
-- `ngroup::Float64`: The group refractive index for the specific photon energy.
-- `energy::Float64`: The photon energy in appropriate units.
-
-## Returns
-- `Photon`: A new Photon object populated with calculated properties.
 """
 struct Photon
     energy::Float64
@@ -61,8 +42,45 @@ struct Photon
     is_z_reflected::Bool
 end
 
-function Photon(
-    p::Particle,
+"""
+    PhotonFactory(radiator, nair, lambda)
+
+Type representing a factory for creating photons with common properties.
+
+# Fields
+- `radiator::Radiator`: The radiator material properties and dimensions.
+- `nair::Float64`: The refractive index of air.
+- `lambda::Float64`: Reference wavelength for calculations.
+"""
+struct PhotonFactory
+    radiator::Radiator
+    constants::Constants
+end
+
+"""
+    create_random_photon(factory, particle, beta, nphase, ngroup, energy)
+
+Creates a Photon instance by determining its direction, emission point, and reflection flags based on the particle's properties, photon energy, and refractive indices. 
+The Cherenkov angle is calculated using the particle's velocity and the phase refractive index. 
+A random azimuthal angle (phi) is uniformly sampled between 0 and 2π to simulate isotropic emission. 
+The emission point is randomly chosen along the radiator depth to reflect realistic photon production. 
+Reflection flags are set by comparing the photon's direction with the critical angle for total internal reflection. 
+Surface roughness effects are excluded from this constructor and are handled separately.
+
+## Arguments
+- `factory::PhotonFactory`: The factory containing radiator and refractive index properties.
+- `particle::Particle`: The particle instance emitting the photon.
+- `beta::Float64`: The velocity factor of the particle (v/c).
+- `nphase::Float64`: The phase refractive index for the specific photon energy.
+- `ngroup::Float64`: The group refractive index for the specific photon energy.
+- `energy::Float64`: The photon energy in appropriate units.
+
+## Returns
+- `Photon`: A new Photon object populated with calculated properties.
+"""
+function create_random_photon(
+    factory::PhotonFactory,
+    particle::Particle,
     beta::Float64,
     nphase::Float64,
     ngroup::Float64,
@@ -76,13 +94,13 @@ function Photon(
     sinthetac = sqrt(1.0 - costhetac^2)
 
     # photon direction
-    xdir, ydir, zdir, slope = _photon_direction(p, costhetac, sinthetac, phi)
+    xdir, ydir, zdir, slope = _photon_direction(particle, costhetac, sinthetac, phi)
 
     # emission point in z
-    xpos, ypos, zpos = _photon_emission(p, RADIATOR.depth * rand())
+    xpos, ypos, zpos = _photon_emission(factory, particle, factory.radiator.depth * rand())
 
     # critical angle
-    sinsqthetacrit = (N_AIR / nphase)^2
+    sinsqthetacrit = (factory.constants.N_AIR / nphase)^2
 
     # check reflection
     is_x_reflected = ((1.0 - xdir * xdir) > sinsqthetacrit)
@@ -100,7 +118,74 @@ function Photon(
         slope,
         nphase,
         ngroup,
-        LAMBDA / energy,
+        factory.constants.LAMBDA / energy,
+        0.0,
+        is_x_reflected,
+        is_y_reflected,
+        is_z_reflected,
+    )
+end
+
+
+"""
+    create_explicit_photon(factory, particle, beta, phic, energy, nphase, ngroup)
+
+Creates a Photon instance with a specific azimuthal angle instead of random sampling.
+The Cherenkov angle is calculated from beta and the phase refractive index.
+The emission point is determined at the default location in the radiator.
+
+# Arguments
+- `factory::PhotonFactory`: The factory containing radiator and refractive index properties.
+- `particle::Particle`: The particle instance emitting the photon.
+- `beta::Float64`: The velocity factor of the particle (v/c).
+- `phic::Float64`: The specified azimuthal angle for the photon emission.
+- `energy::Float64`: The photon energy in appropriate units.
+- `nphase::Float64`: The phase refractive index for the specific photon energy.
+- `ngroup::Float64`: The group refractive index for the specific photon energy.
+
+# Returns
+- `Photon`: A new Photon object populated with calculated properties.
+"""
+function create_explicit_photon(
+    factory::PhotonFactory,
+    particle::Particle,
+    beta::Float64,
+    phic::Float64,
+    energy::Float64,
+    nphase::Float64,
+    ngroup::Float64,
+)::Photon
+
+    # emission point in z
+    xpos, ypos, zpos = _photon_emission(factory, particle)
+
+    # cos and sinsqthetac
+    costhetac = 1.0 / (beta * nphase)
+    sinthetac = sqrt(1.0 - costhetac^2)
+
+    # photon direction
+    xdir, ydir, zdir, slope = _photon_direction(p, costhetac, sinthetac, phic)
+
+    # critical angle
+    sinsqthetacrit = (factory.nair / nphase)^2
+
+    # check reflection
+    is_x_reflected = ((1.0 - xdir * xdir) > sinsqthetacrit)
+    is_y_reflected = ((1.0 - ydir * ydir) > sinsqthetacrit)
+    is_z_reflected = ((1.0 - zdir * zdir) > sinsqthetacrit)
+
+    Photon(
+        energy,
+        xdir,
+        ydir,
+        zdir,
+        xpos,
+        ypos,
+        zpos,
+        slope,
+        nphase,
+        ngroup,
+        factory.lambda / energy,
         0.0,
         is_x_reflected,
         is_y_reflected,
@@ -109,21 +194,86 @@ function Photon(
 end
 
 """
-    test_z_surface_roughness(photon::Photon, nreflec::Int)::Bool
+    create_explicit_photon(factory, particle, thetac, phic, energy, nphase, ngroup, xemission, yemission, zemission)
 
-`test_z_surface_roughness` tests the photon surface roughness in the z-direction. 
-    Surface roughness is modeled as a Gaussian effect dependent on wavelength. 
-    The probability of passing decreases with number of reflections.
+Creates a Photon instance with precisely specified Cherenkov angle, azimuthal angle, and emission point coordinates.
+This function provides maximum control over the photon properties for simulation purposes.
+
+# Arguments
+- `factory::PhotonFactory`: The factory containing radiator and refractive index properties.
+- `particle::Particle`: The particle instance emitting the photon.
+- `thetac::Float64`: The specified Cherenkov angle for the photon emission.
+- `phic::Float64`: The specified azimuthal angle for the photon emission.
+- `energy::Float64`: The photon energy in appropriate units.
+- `nphase::Float64`: The phase refractive index for the specific photon energy.
+- `ngroup::Float64`: The group refractive index for the specific photon energy.
+- `xemission::Float64`: The x-coordinate of the emission point.
+- `yemission::Float64`: The y-coordinate of the emission point.
+- `zemission::Float64`: The z-coordinate of the emission point (depth in radiator).
+
+# Returns
+- `Photon`: A new Photon object populated with calculated properties.
+"""
+function create_explicit_photon(
+    factory::PhotonFactory,
+    particle::Particle,
+    thetac::Float64,
+    phic::Float64,
+    energy::Float64,
+    nphase::Float64,
+    ngroup::Float64,
+    xemission::Float64,
+    yemission::Float64,
+    zemission::Float64,
+)::Photon
+
+    # photon direction
+    xdir, ydir, zdir, slope = _photon_direction(particle, cos(thetac), sin(thetac), phic)
+
+    # critical angle
+    sinsqthetacrit = (factory.constants.N_AIR / nphase)^2
+
+    # check reflection
+    is_x_reflected = ((1.0 - xdir * xdir) > sinsqthetacrit)
+    is_y_reflected = ((1.0 - ydir * ydir) > sinsqthetacrit)
+    is_z_reflected = ((1.0 - zdir * zdir) > sinsqthetacrit)
+
+    Photon(
+        energy,
+        xdir,
+        ydir,
+        zdir,
+        xemission,
+        yemission + 0.5 * factory.radiator.height,
+        zemission,
+        slope,
+        nphase,
+        ngroup,
+        factory.constants.LAMBDA / energy,
+        0.0,
+        is_x_reflected,
+        is_y_reflected,
+        is_z_reflected,
+    )
+end
+
+"""
+    test_z_surface_roughness(photon::Photon, roughness::Float64, nreflec::Int)::Bool
+
+Tests the photon surface roughness in the z-direction. 
+Surface roughness is modeled as a Gaussian effect dependent on wavelength.
+The probability of passing decreases with number of reflections.
 
 # Arguments
 - `photon::Photon`: The photon instance.
+- `roughness::Float64`: The surface roughness parameter in appropriate units.
 - `nreflec::Int`: The number of reflections.
 
 # Returns
 - `Bool`: Whether the photon passes the surface roughness condition (true) or not (false).
 """
-function test_z_surface_roughness(photon::Photon, nreflec::Int)::Bool
-    c = π * photon.np * ROUGHNESS / photon.lambda
+function test_z_surface_roughness(photon::Photon, roughness::Float64, nreflec::Int)::Bool
+    c = π * photon.np * roughness / photon.lambda
     r = exp(-c * c)
     return rand() < r^nreflec
 end
@@ -215,15 +365,22 @@ end
 - `Tuple{Float64,Float64,Float64}`: A tuple containing (xpos, ypos, zpos) of the emission point.
 
 """
-function _photon_emission(p::Particle, zemission::Float64)::Tuple{Float64,Float64,Float64}
-    xpos = p.xCoord + zemission * p.xDir / p.zDir
-    ypos = p.yCoord + zemission * p.yDir / p.zDir
-    ypos += 0.5 * RADIATOR.height
+function _photon_emission(
+    factory::PhotonFactory,
+    p::Particle,
+    zemission::Float64,
+)::Tuple{Float64,Float64,Float64}
+    xpos = p.xCoord + zemission * (p.xDir / p.zDir)
+    ypos = p.yCoord + zemission * (p.yDir / p.zDir)
+    ypos += 0.5 * factory.radiator.height
     return xpos, ypos, zemission
 end
 
-function _photon_emission(p::Particle)::Tuple{Float64,Float64,Float64}
+function _photon_emission(
+    factory::PhotonFactory,
+    p::Particle,
+)::Tuple{Float64,Float64,Float64}
     # emission point in z
-    zemission = RADIATOR.depth * 0.5
-    return _photon_emission(p, zemission)
+    zemission = factory.radiator.depth * 0.5
+    return _photon_emission(factory, p, zemission)
 end

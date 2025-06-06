@@ -36,3 +36,12 @@ const N_AIR = 1.00029
 
 """Surface roughness (nm): 0.5"""
 const ROUGHNESS = 0.5
+
+struct Constants
+    CLIGHT::Float64
+    LAMBDA::Float64
+    N_AIR::Float64
+    ROUGHNESS::Float64
+end
+
+CONSTANTS = Constants(CLIGHT, LAMBDA, N_AIR, ROUGHNESS)
