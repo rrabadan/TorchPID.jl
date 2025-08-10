@@ -286,3 +286,19 @@ end
 function spectrum_above_threshold(d::PhotonSpectrumDistribution)::Bool
     return d.yield_per_mm > 0.0
 end
+
+function spectrum_random_sampling( #approximate
+    s::PhotonSpectrum,
+    d::PhotonSpectrumDistribution,
+    rndm::Float64,
+)::Union{Tuple{Float64,Float64,Float64},Nothing}
+    i = searchsortedfirst(d.cumulative, rndm)
+    if i <= length(d.cumulative) && d.cumulative[i] > rndm
+        n = i
+        energy = s.energy[n]
+        nphase = s.nphase[n]
+        ngroup = s.ngroup[n]
+        return (energy, nphase, ngroup)
+    end
+    return nothing
+end
