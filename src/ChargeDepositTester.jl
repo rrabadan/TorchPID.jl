@@ -137,9 +137,9 @@ struct ChargeDepositTester
     n_ybins::Int
     charge_sharing::Bool
     clustering::Bool
-    #time_cache::Vector{Float64}
-    #xf::Vector{Float64}
-    #yf::Vector{Float64}
+    time_cache::Vector{Float64}
+    xf::Vector{Float64}
+    yf::Vector{Float64}
 end
 
 function ChargeDepositTester(;
@@ -154,6 +154,16 @@ function ChargeDepositTester(;
     resolution = SIGNAL.time_resolution
 
     space_step = 0.1 * min(DETECTOR.x_size, DETECTOR.y_size)
+
+    xf = zeros(Float64, n_space)
+    yf = zeros(Float64, n_space)
+
+    for i = 1:n_space
+        xf[i] =
+            _gaussian_integral(space_step * (i + 0.5), point_spread, 0.0, DETECTOR.x_size)
+        yf[i] =
+            _gaussian_integral(space_step * (i + 0.5), point_spread, 0.0, DETECTOR.y_size)
+    end
 
     n_xbins = _get_max_bins(
         DETECTOR.x_size,
@@ -172,6 +182,18 @@ function ChargeDepositTester(;
         threshold,
     )
 
+    # time template
+    time_cache = zeros(Float64, 2 * n_time + 1)
+    for i = -n_time:n_time
+        p = _gaussian_integral(
+            0.0,
+            resolution,
+            (i - 0.5) * DETECTOR.t_bin,
+            (i + 0.5) * DETECTOR.t_bin,
+        )
+        time_cache[i+n_time+1] = p
+    end
+
     ChargeDepositTester(
         gain,
         threshold,
@@ -184,6 +206,9 @@ function ChargeDepositTester(;
         n_ybins,
         charge_sharing,
         clustering,
+        time_cache,
+        xf,
+        yf,
     )
 end
 
@@ -315,4 +340,21 @@ function smear_time(cdt::ChargeDepositTester, hit::HitCoordinate)::HitCoordinate
     # Apply Gaussian smearing to the time
     smeared_time = hit.time + randn() * cdt.resolution
     return HitCoordinate(hit.x, hit.y, smeared_time)
+end
+
+"""
+    cached_time_weights(cdt::ChargeDepositTester, start::Integer)
+
+Returns a view of the `time_cache` from the `start` index to the end.
+This function is an efficient way to get a sub-array of time weights without allocating new memory.
+
+# Arguments
+- `cdt::ChargeDepositTester`: The charge deposit tester configuration.
+- `start::Integer`: The starting index for the view (1-based).
+
+# Returns
+- `SubArray`: A view of the `time_cache` vector.
+"""
+function cached_time_weights(cdt::ChargeDepositTester, start::Integer)::SubArray{Float64,1}
+    return @view cdt.time_cache[start:end]
 end
