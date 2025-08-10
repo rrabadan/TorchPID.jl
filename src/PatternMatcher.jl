@@ -99,3 +99,57 @@ end
 function _get_time_offset(particle::Particle, beta::Float64, depth::Float64)::Float64
     return _get_time_offset(particle, beta, depth, particle.t0)
 end
+
+
+struct RandomPoint
+    e::Float64
+    emissionZ::Float64
+    phi::Float64
+    cosPhi::Float64
+    sinPhi::Float64
+end
+
+function random_point()
+    point = (randn(), randn(), randn())
+    e = point[3]
+    emissionZ = point[2] * 10 # Convert to mm
+    phi = point[1] * 2 * π
+    cosPhi = cos(phi)
+    sinPhi = sin(phi)
+    return RandomPoint(e, emissionZ, phi, cosPhi, sinPhi)
+end
+
+function make_pattern(
+    particle::Particle,
+    beta::Float64,
+    mapper::PhotonMapper,
+    spectrum::PhotonSpectrum,
+    distribution::PhotonSpectrumDistribution,
+    factory::PhotonFactory,
+    n_generations::Int=1000000,
+)::Float64
+    for i = 1:n_generations
+        point = random_point()
+        spectra = spectrum_random_sampling(spectrum, distribution, point.e)
+        if isnothing(spectra)
+            continue
+        end
+        energy, nphase, ngroup = spectra
+        photon = create_approximate_photon(
+            factory,
+            particle,
+            beta,
+            nphase,
+            ngroup,
+            energy,
+            point.emissionZ,
+            point.phi,
+        )
+        time_offset = _get_time_offset(particle, beta, photon.zpos, particle.t0)
+
+        hit = trace_photon(mapper, photon, time_offset)
+        if isnothing(hit)
+            continue
+        end
+    end
+end

@@ -13,7 +13,7 @@ export HitCoordinate, PixelHit
 export DetectorHitTester, photon_efficiency, test_photon
 export PhotonSpectrum, PhotonSpectrumDistribution
 export spectrum_nphase, spectrum_ngroup
-export spectrum_yield, spectrum_random_energy, spectrum_probability
+export spectrum_yield, spectrum_random_energy, spectrum_probability, spectrum_random_sampling
 export Particle, particle_beta, particle_gamma, initial_rotation!, rotate, get_particle_mass
 export PARTICLE_PROPERTIES
 export Photon,
@@ -23,7 +23,7 @@ export Photon,
     test_z_surface_roughness,
     in_focus_acceptance
 export PhotonMapper, trace_photon
-export project_pattern
+export project_pattern, make_pattern
 export ChargeDepositTester, charge_over_threshold, get_charge, get_smeared_time, smear_time
 export FrontEnd, create_mcp_images, add_photon!, reset!, get_hits
 export TestBeamSimulator,
