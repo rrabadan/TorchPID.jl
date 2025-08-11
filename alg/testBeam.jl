@@ -35,35 +35,35 @@ function update_histograms(pMag_data, pixels_x, pixels_y)
         # Create histograms
         p1 = histogram(
             pMag_data,
-            bins = 50,
-            title = "Particle Momentum Magnitude",
-            xlabel = "pMag",
-            ylabel = "Count",
-            legend = false,
+            bins=50,
+            title="Particle Momentum Magnitude",
+            xlabel="pMag",
+            ylabel="Count",
+            legend=false,
         )
         p2 = scatter(
             pixels_x,
             pixels_y,
-            title = "Photon Hits",
-            xlabel = "X pixel",
-            ylabel = "Y pixel",
-            markersize = 2,
-            markerstrokewidth = 0,
-            alpha = 0.6,
-            legend = false,
+            title="Photon Hits",
+            xlabel="X pixel",
+            ylabel="Y pixel",
+            markersize=2,
+            markerstrokewidth=0,
+            alpha=0.6,
+            legend=false,
         )
 
         # Display the plots side by side with proper layout management
         plot(
             p1,
             p2,
-            layout = (1, 2),
-            size = (1200, 500),
-            margin = 5Plots.mm,     # Add margins to avoid cutting off labels
-            dpi = 300,              # Higher resolution
-            titlefontsize = 10,     # Adjust title size
-            guidefontsize = 8,      # Adjust axis label size
-            tickfontsize = 6,
+            layout=(1, 2),
+            size=(1200, 500),
+            margin=5Plots.mm,     # Add margins to avoid cutting off labels
+            dpi=300,              # Higher resolution
+            titlefontsize=10,     # Adjust title size
+            guidefontsize=8,      # Adjust axis label size
+            tickfontsize=6,
         )       # Adjust tick label size
 
         display(current())  # Use display instead of gui() for better stability
@@ -83,7 +83,7 @@ function main()
     tb_simulator = TestBeamSimulator()
     photon_spectrum = PhotonSpectrum()
     photon_mapper = PhotonMapper()
-    photon_factory = PhotonFactory(RADIATOR, CONSTANTS)
+    photon_context = PhotonContext(RADIATOR, CONSTANTS)
     frontend = FrontEnd(DETECTOR)
     charge_tester = ChargeDepositTester()
 
@@ -103,14 +103,14 @@ function main()
 
         tb_particle = generate_particle(
             tb_simulator,
-            photon_factory.radiator,
-            photon_factory.constants,
+            photon_context.radiator,
+            photon_context.constants,
         )
         tb_photons = generate_photons(
             tb_particle,
             photon_spectrum,
             photon_mapper,
-            photon_factory,
+            photon_context,
             frontend,
             charge_tester,
         )
