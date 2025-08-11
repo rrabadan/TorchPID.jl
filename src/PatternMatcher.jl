@@ -1,6 +1,6 @@
 """
-    project_pattern(particle, beta, mapper, spectrum, distribution)
-    project_pattern(particle, beta, mapper, spectrum)
+    project_pattern(particle, beta, mapper, spectrum, distribution, context)
+    project_pattern(particle, beta, mapper, spectrum, context)
 
 `project_pattern` calculates the hit coordinate pattern for a particle defined by its velocity factor (`beta`) and trajectory. 
     It generates photons with energies sampled from the `PhotonSpectrum` and `PhotonSpectrumDistribution`, 
@@ -14,6 +14,7 @@
 - `mapper::PhotonMapper`: Used to map photon properties to detector hit coordinates.
 - `spectrum::PhotonSpectrum`: Energy spectrum of photons.
 - `distribution::PhotonSpectrumDistribution`: Details of the photon distribution.
+- `context::PhotonContext`: Context containing the radiator and constants used for calculations.
 
 # Returns
 - `Vector{HitCoordinate}`: A vector of hit coordinates compatible with the provided spectrum and particle parameters.
@@ -24,7 +25,7 @@ function project_pattern(
     mapper::PhotonMapper,
     spectrum::PhotonSpectrum,
     distribution::PhotonSpectrumDistribution,
-    factory::PhotonFactory,
+    context::PhotonContext,
 )::Vector{HitCoordinate}
     hits = HitCoordinate[]
 
@@ -32,7 +33,7 @@ function project_pattern(
         return hits
     end
 
-    pathlength = factory.radiator.depth / particle.zDir
+    pathlength = context.radiator.depth / particle.zDir
     photonYield = spectrum_yield(distribution, pathlength)
 
     # Poisson distribution
@@ -43,10 +44,10 @@ function project_pattern(
         n_phase = nphase_Corning(energy)
         n_group = ngroup_Corning(energy)
 
-        photon = create_random_photon(factory, particle, beta, n_phase, n_group, energy)
+        photon = create_random_photon(particle, beta, n_phase, n_group, energy, context)
 
         # Calculate the time offset
-        time_offset = _get_time_offset(particle, beta, photon.zpos)
+        time_offset = _get_time_offset(particle, beta, photon.zpos, context)
 
         hit = trace_photon(mapper, photon, time_offset)
 
@@ -64,14 +65,14 @@ function project_pattern(
     beta::Float64,
     mapper::PhotonMapper,
     spectrum::PhotonSpectrum,
-    factory::PhotonFactory,
+    context::PhotonContext,
 )::Vector{HitCoordinate}
     photonDistribution = PhotonSpectrumDistribution(spectrum, particle, beta)
-    return project_pattern(particle, beta, mapper, spectrum, photonDistribution, factory)
+    return project_pattern(particle, beta, mapper, spectrum, photonDistribution, context)
 end
 
 """
-    _get_time_offset(particle, beta, depth, time)
+    _get_time_offset(particle, beta, depth, time, context)
 
 `_get_time_offset` computes the time offset for a particle based on its velocity and traveled distance. 
     The calculation incorporates the particle's path length and its depth within the detector. 
@@ -82,6 +83,7 @@ end
 - `beta::Float64`: The particle's velocity factor relative to the speed of light.
 - `depth::Float64`: The measured depth in the detector in millimeters (mm).
 - `time::Float64`: The initial time offset for the particle.
+- `context::PhotonContext`: Context containing the radiator and constants used for calculations.
 
 # Returns
 - `Float64`: The computed time offset adjusted by the particle's path length and depth.
@@ -91,13 +93,19 @@ function _get_time_offset(
     beta::Float64,
     depth::Float64,
     time::Float64,
+    context::PhotonContext,
 )::Float64
     distance = particle.pathlength + (depth / particle.zDir)
-    return time + distance / (beta * CLIGHT)
+    return time + distance / (beta * context.constants.CLIGHT)
 end
 
-function _get_time_offset(particle::Particle, beta::Float64, depth::Float64)::Float64
-    return _get_time_offset(particle, beta, depth, particle.t0)
+function _get_time_offset(
+    particle::Particle,
+    beta::Float64,
+    depth::Float64,
+    context::PhotonContext,
+)::Float64
+    return _get_time_offset(particle, beta, depth, particle.t0, context)
 end
 
 
@@ -125,10 +133,17 @@ function make_pattern(
     mapper::PhotonMapper,
     spectrum::PhotonSpectrum,
     distribution::PhotonSpectrumDistribution,
-    factory::PhotonFactory,
-    n_generations::Int=1000000,
+    image::TorchImageAccumulator,
+    context::PhotonContext,
+    n_generations::Int = 1000000,
 )::Float64
-    for i = 1:n_generations
+    if !spectrum_above_threshold(distribution)
+        return 0.0
+    end
+
+    reset!(image)
+
+    for _ = 1:n_generations
         point = random_point()
         spectra = spectrum_random_sampling(spectrum, distribution, point.e)
         if isnothing(spectra)
@@ -136,7 +151,6 @@ function make_pattern(
         end
         energy, nphase, ngroup = spectra
         photon = create_approximate_photon(
-            factory,
             particle,
             beta,
             nphase,
@@ -144,12 +158,42 @@ function make_pattern(
             energy,
             point.emissionZ,
             point.phi,
+            context,
         )
-        time_offset = _get_time_offset(particle, beta, photon.zpos, particle.t0)
+        time_offset = _get_time_offset(particle, beta, photon.zpos, particle.t0, context)
 
         hit = trace_photon(mapper, photon, time_offset)
         if isnothing(hit)
             continue
         end
+        if !fill_smeared!(image, hit)
+            continue
+        end
     end
+    eff = image.integral / n_generations
+    pathlength = context.radiator.depth / particle.zDir
+    expected_yield = eff * spectrum_yield(distribution, pathlength)
+    return expected_yield
+end
+
+function make_pattern(
+    particle::Particle,
+    beta::Float64,
+    mapper::PhotonMapper,
+    spectrum::PhotonSpectrum,
+    image::TorchImageAccumulator,
+    context::PhotonContext,
+    n_generations::Int = 1000000,
+)::Float64
+    photonDistribution = PhotonSpectrumDistribution(spectrum, particle, beta)
+    return make_pattern(
+        particle,
+        beta,
+        mapper,
+        spectrum,
+        photonDistribution,
+        image,
+        context,
+        n_generations,
+    )
 end
