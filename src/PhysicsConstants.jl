@@ -44,4 +44,4 @@ struct Constants
     ROUGHNESS::Float64
 end
 
-CONSTANTS = Constants(CLIGHT, LAMBDA, N_AIR, ROUGHNESS)
+const CONSTANTS = Constants(CLIGHT, LAMBDA, N_AIR, ROUGHNESS)

@@ -456,15 +456,15 @@ function Geometry(;
 end
 
 # Create instances of the structs and export them
-RADIATOR = Radiator(height = 2500.0, width = 660.0, depth = 10.0)
-WEDGE = Wedge(RADIATOR)
-FOCUS = Focus(RADIATOR, WEDGE)
-DETECTOR = Detector(RADIATOR, WEDGE)
-MASK = Mask()
-SIGNAL = SignalParameters()
+const RADIATOR = Radiator(height = 2500.0, width = 660.0, depth = 10.0)
+const WEDGE = Wedge(RADIATOR)
+const FOCUS = Focus(RADIATOR, WEDGE)
+const DETECTOR = Detector(RADIATOR, WEDGE)
+const MASK = Mask()
+const SIGNAL = SignalParameters()
 
 # Create a single GEOMETRY object that contains all components
-GEOMETRY = Geometry(
+const GEOMETRY = Geometry(
     radiator = RADIATOR,
     wedge = WEDGE,
     focus = FOCUS,
