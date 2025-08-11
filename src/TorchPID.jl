@@ -33,6 +33,8 @@ export project_pattern, make_pattern
 export FrontEnd, create_mcp_images, add_photon!, reset!, get_hits
 export TestBeamSimulator,
     TestBeamParticle, TestBeamPhotons, generate_particle, generate_photons
+export FlatBackground, get_bkg_probability
+export run_local_pid
 export PhotonHit,
     update_photon_hit!,
     photon_from_radiator,
@@ -58,6 +60,8 @@ include("PatternMatcher.jl")
 include("PixelMapper.jl")
 include("FrontEnd.jl")
 include("TestBeam.jl")
+include("Background.jl")
+include("LocalPID.jl")
 include("PhotonHit.jl")
 include("EventReader.jl")
 include("PIDAlgorithm.jl")
