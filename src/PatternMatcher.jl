@@ -134,6 +134,7 @@ function make_pattern(
     spectrum::PhotonSpectrum,
     distribution::PhotonSpectrumDistribution,
     image::TorchImageAccumulator,
+    cdt::ChargeDepositTester,
     context::PhotonContext,
     n_generations::Int = 1000000,
 )::Float64
@@ -166,7 +167,7 @@ function make_pattern(
         if isnothing(hit)
             continue
         end
-        if !fill_smeared!(image, hit)
+        if !fill!(image, cdt, hit)
             continue
         end
     end
@@ -182,6 +183,7 @@ function make_pattern(
     mapper::PhotonMapper,
     spectrum::PhotonSpectrum,
     image::TorchImageAccumulator,
+    cdt::ChargeDepositTester,
     context::PhotonContext,
     n_generations::Int = 1000000,
 )::Float64
@@ -193,6 +195,7 @@ function make_pattern(
         spectrum,
         photonDistribution,
         image,
+        cdt,
         context,
         n_generations,
     )
