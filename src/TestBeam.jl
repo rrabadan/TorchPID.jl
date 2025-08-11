@@ -315,7 +315,7 @@ function generate_photons(
     particle::TestBeamParticle,
     spectrum::PhotonSpectrum,
     mapper::PhotonMapper,
-    factory::PhotonFactory,
+    context::PhotonContext,
     fe::FrontEnd,
     cdt::ChargeDepositTester,
 )::Union{Nothing,TestBeamPhotons}
@@ -328,7 +328,7 @@ function generate_photons(
         mapper,
         spectrum,
         photon_distribution,
-        factory,
+        context,
     )
     photon_yield = length(photons)
     #println("Photon yield: ", photon_yield)
