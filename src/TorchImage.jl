@@ -26,6 +26,11 @@ function TorchImage(detector::Detector)::TorchImage
     return TorchImage(nx, ny, nt, tmin, tmax, vec(data))
 end
 
+function TorchImageAccumulator(detector::Detector)::TorchImageAccumulator
+    image = TorchImage(detector)
+    return TorchImageAccumulator(image, 0.0, 0)
+end
+
 function reset!(acc::TorchImageAccumulator)::Nothing
     acc.integral = 0.0
     acc.filled = 0
@@ -42,6 +47,8 @@ function fill!(acc::TorchImageAccumulator, x::Int, y::Int, t::Int)::Bool
     if is_validpixel(image, x, y, t)
         pixel = (image.nt * image.ny) * x + image.nt * y + t
         image.data[pixel+1] += 1.0
+        acc.integral += 1.0
+        acc.filled += 1
         return true
     end
     return false
@@ -93,15 +100,11 @@ function fill_smeared!(
     return true
 end
 
-function fill_smeared!(
-    acc::TorchImageAccumulator,
-    cdt::ChargeDepositTester,
-    hit::PixelHit,
-)::Bool
+function fill!(acc::TorchImageAccumulator, cdt::ChargeDepositTester, hit::PixelHit)::Bool
     return fill_smeared!(acc, cdt, hit.x, hit.y, hit.t)
 end
 
-function fill_smeared!(
+function fill!(
     acc::TorchImageAccumulator,
     cdt::ChargeDepositTester,
     hit::HitCoordinate,

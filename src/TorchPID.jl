@@ -28,7 +28,7 @@ export Photon,
 export PhotonMapper, trace_photon
 export ChargeDepositTester,
     charge_over_threshold, get_charge, get_smeared_time, smear_time, cached_time_weights
-export TorchImage, TorchImageAccumulator, fill_smeared!, fill_smeared, fill_smeared!
+export TorchImage, TorchImageAccumulator, fill!, reset!
 export project_pattern, make_pattern
 export FrontEnd, create_mcp_images, add_photon!, reset!, get_hits
 export TestBeamSimulator,
