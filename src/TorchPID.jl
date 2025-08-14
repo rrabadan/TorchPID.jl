@@ -32,7 +32,7 @@ export TorchImage, TorchImageAccumulator, fill!, reset!
 export project_pattern, make_pattern
 export FrontEnd, create_mcp_images, add_photon!, reset!, get_hits
 export TestBeamSimulator,
-    TestBeamParticle, TestBeamPhotons, generate_particle, generate_photons
+    TestBeamParticle, TestBeamPhotons, generate_particles, generate_photons_batch
 export FlatBackground, get_bkg_probability
 export run_local_pid
 export PhotonHit,

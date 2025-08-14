@@ -76,10 +76,8 @@ function main()
     args = parse_commandline()
     events = args["events"]
     plot_interval = args["plot-interval"]
+    batch_size = 1000  # Choose a reasonable batch size
 
-    println("Running in single-threaded mode")
-
-    # Create configuration
     tb_simulator = TestBeamSimulator()
     photon_spectrum = PhotonSpectrum()
     photon_mapper = PhotonMapper()
@@ -87,27 +85,23 @@ function main()
     frontend = FrontEnd(DETECTOR)
     charge_tester = ChargeDepositTester()
 
-    # Initialize progress counter
     progress = 0
+    pMag = Float64[]
+    pixels_x = Float64[]
+    pixels_y = Float64[]
 
-    # Data containers for histograms
-    pMag = Vector{Float64}()
-    pixels_x = Vector{Float64}()
-    pixels_y = Vector{Float64}()
-
-    # Create initial empty plot
     update_histograms(pMag, pixels_x, pixels_y)
 
-    # Process events sequentially
-    for event = 1:events
-
-        tb_particle = generate_particle(
+    for batch_start in 1:batch_size:events
+        this_batch = min(batch_size, events - batch_start + 1)
+        tb_particles = generate_particles(
             tb_simulator,
             photon_context.radiator,
             photon_context.constants,
+            this_batch,
         )
-        tb_photons = generate_photons(
-            tb_particle,
+        tb_photons = generate_photons_batch(
+            tb_particles,
             photon_spectrum,
             photon_mapper,
             photon_context,
@@ -115,26 +109,23 @@ function main()
             charge_tester,
         )
 
-        # Collect histogram data
-        push!(pMag, tb_particle.particle.pMag)
-        for i = 1:tb_photons.npixels
-            push!(pixels_x, tb_photons.xpixels[i])
-            push!(pixels_y, tb_photons.ypixels[i])
+        for i in 1:this_batch
+            push!(pMag, tb_particles[i].particle.pMag)
+            photons = tb_photons[i]
+            if photons !== nothing
+                for j in 1:photons.npixels
+                    push!(pixels_x, photons.xpixels[j])
+                    push!(pixels_y, photons.ypixels[j])
+                end
+            end
         end
 
-        # Progress update
-        progress += 1
-        if progress % 100000 == 0
-            println("Processed $progress events")
-        end
-
-        # Update plots periodically
+        progress += this_batch
         if progress % plot_interval == 0
             update_histograms(pMag, pixels_x, pixels_y)
         end
     end
 
-    # Final histogram update
     update_histograms(pMag, pixels_x, pixels_y)
     println("\nSimulation complete. Press Enter to exit.")
     readline()

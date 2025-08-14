@@ -227,63 +227,72 @@ The timing reference position and flight time are calculated using the `timingDi
 # Returns
 - `TestBeamParticle`: A simulated test beam particle.
 """
-function generate_particle(
+function generate_particles(
     tb::TestBeamSimulator,
     radiator::Radiator,
     constants::Constants,
-)::TestBeamParticle
+    N::Int,
+)::Vector{TestBeamParticle}
     # Generate the entry point using Normal distribution
-    entryX = tb.entryX + tb.sigmaEntryX * randn()
-    entryY = tb.entryY + tb.sigmaEntryY * randn()
+    entryX = tb.entryX .+ tb.sigmaEntryX .* randn(N)
+    entryY = tb.entryY .+ tb.sigmaEntryY .* randn(N)
 
-    entryX -= radiator.half_width
-    entryY -= 0.5 * radiator.height
+    entryX .-= radiator.half_width
+    entryY .-= 0.5 * radiator.height
 
     # Generate the momentum
-    momentum = tb.momentumMean + tb.momentumSigma * randn()
-
+    momentum = tb.momentumMean .+ tb.momentumSigma .* randn(N)
     mass = get_particle_mass(tb.pid)
-    energy = sqrt(momentum^2 + mass^2)
-    beta = momentum / energy
+    energy = sqrt.(momentum .^ 2 .+ mass^2)
+    beta = momentum ./ energy
 
     # Generate the angles
-    theta = tb.thetaMean + tb.thetaSigma * randn()
-    phi = tb.phiMean + tb.phiSigma * randn()
+    theta = tb.thetaMean .+ tb.thetaSigma .* randn(N)
+    phi = tb.phiMean .+ tb.phiSigma .* randn(N)
 
     # Generate the direction
-    px = momentum * sin(theta) * cos(phi)
-    py = momentum * sin(theta) * sin(phi)
-    pz = momentum * cos(theta)
+    px = momentum .* sin.(theta) .* cos.(phi)
+    py = momentum .* sin.(theta) .* sin.(phi)
+    pz = momentum .* cos.(theta)
 
-    pathlength = tb.timingDistance / cos(theta)
-    flightTime = pathlength / (beta * constants.CLIGHT)
+    pathlength = tb.timingDistance ./ cos.(theta)
+    flightTime = pathlength ./ (beta .* constants.CLIGHT)
 
-    timingPositionX = entryX - pathlength * cos(phi) * sin(theta)
-    timingPositionY = entryY - pathlength * sin(phi) * sin(theta)
+    timingPositionX = entryX .- pathlength .* cos.(phi) .* sin.(theta)
+    timingPositionY = entryY .- pathlength .* sin.(phi) .* sin.(theta)
 
-    t0 = tb.timingResolution == 0 ? 0 : tb.timingResolution * randn()
+    t0 = tb.timingResolution == 0 ? zeros(N) : tb.timingResolution .* randn(N)
 
-    xDir = px / momentum
-    yDir = py / momentum
-    zDir = pz / momentum
+    xDir = px ./ momentum
+    yDir = py ./ momentum
+    zDir = pz ./ momentum
 
-    particle = Particle(
-        tb.pid,
-        entryX,
-        entryY,
-        momentum,
-        xDir,
-        yDir,
-        zDir,
-        px,
-        py,
-        pz,
-        pathlength,
-        t0,
-    )
-    initial_rotation!(particle)
-
-    TestBeamParticle(particle, energy, beta, (timingPositionX, timingPositionY), flightTime)
+    particles = Vector{TestBeamParticle}(undef, N)
+    for i = 1:N
+        particle = Particle(
+            tb.pid,
+            entryX[i],
+            entryY[i],
+            momentum[i],
+            xDir[i],
+            yDir[i],
+            zDir[i],
+            px[i],
+            py[i],
+            pz[i],
+            pathlength[i],
+            t0[i],
+        )
+        initial_rotation!(particle)
+        particles[i] = TestBeamParticle(
+            particle,
+            energy[i],
+            beta[i],
+            (timingPositionX[i], timingPositionY[i]),
+            flightTime[i],
+        )
+    end
+    return particles
 end
 
 """
@@ -351,24 +360,37 @@ function generate_photons(
     end
 
     npixels = length(pixels)
+    #println("Number of valid pixels: ", npixels)
 
-    xpixels = Vector{Float64}(undef, 0)
-    ypixels = Vector{Float64}(undef, 0)
-    tpixels = Vector{Float64}(undef, 0)
+    xpixels = Vector{Float64}(undef, photon_yield)
+    ypixels = Vector{Float64}(undef, photon_yield)
+    tpixels = Vector{Float64}(undef, photon_yield)
+    mcp = Vector{Int}(undef, photon_yield)
+    mcpcolum = Vector{Int}(undef, photon_yield)
+    charge = Vector{Float64}(undef, photon_yield)
 
-    mcp = Vector{Int}(undef, 0)
-    mcpcolum = Vector{Int}(undef, 0)
-    charge = Vector{Float64}(undef, 0)
-
-    for pixel in pixels
-        push!(xpixels, pixel.x)
-        push!(ypixels, pixel.y)
-        push!(tpixels, pixel.t)
-
-        push!(mcp, pixel.x ÷ fe.n_xpixels)
-        push!(mcpcolum, pixel.x % fe.n_xpixels)
-        push!(charge, pixel.ch)
-    end
+    xpixels = @view xpixels[1:npixels]
+    ypixels = @view ypixels[1:npixels]
+    tpixels = @view tpixels[1:npixels]
+    mcp = @view mcp[1:npixels]
+    mcpcolum = @view mcpcolum[1:npixels]
+    charge = @view charge[1:npixels]
 
     TestBeamPhotons(photon_yield, npixels, xpixels, ypixels, tpixels, mcp, mcpcolum, charge)
+end
+
+function generate_photons_batch(
+    particles::Vector{TestBeamParticle},
+    spectrum::PhotonSpectrum,
+    mapper::PhotonMapper,
+    context::PhotonContext,
+    fe::FrontEnd,
+    cdt::ChargeDepositTester,
+)::Vector{Union{Nothing,TestBeamPhotons}}
+    N = length(particles)
+    results = Vector{Union{Nothing,TestBeamPhotons}}(undef, N)
+    for i = 1:N
+        results[i] = generate_photons(particles[i], spectrum, mapper, context, fe, cdt)
+    end
+    return results
 end
