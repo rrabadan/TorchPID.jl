@@ -8,6 +8,7 @@ mutable struct PhotonHit
     emissionY::Union{Float64,Nothing}
     emissionZ::Union{Float64,Nothing}
     emissionTime::Union{Float64,Nothing}
+    timeOfFlight::Union{Float64,Nothing}
 
     moduleId::Int32
     trackId::Int32
@@ -18,6 +19,10 @@ mutable struct PhotonHit
 
     cherenkovTheta::Union{Float64,Nothing}
     cherenkovPhi::Union{Float64,Nothing}
+    pathlengthInRadiator::Union{Float64,Nothing}
+    GlobalX::Union{Float64,Nothing}
+    GlobalY::Union{Float64,Nothing}
+    GlobalZ::Union{Float64,Nothing}
 
     function PhotonHit(
         localX,
@@ -29,6 +34,7 @@ mutable struct PhotonHit
         emissionY,
         emissionZ,
         emissionTime,
+        timeOfFlight,
         moduleId,
         trackId,
         isDownward,
@@ -45,11 +51,16 @@ mutable struct PhotonHit
             emissionY,
             emissionZ,
             emissionTime,
+            timeOfFlight,
             moduleId,
             trackId,
             isDownward,
             isSurfaceScattered,
             isRayleighScattered,
+            nothing,
+            nothing,
+            nothing,
+            nothing,
             nothing,
             nothing,
         )
@@ -81,6 +92,7 @@ function update_photon_hit!(hit::PhotonHit, hit_data; Debug::Bool = false)
     hit.emissionY = hit_data.EmissionY
     hit.emissionZ = hit_data.EmissionZ
     hit.emissionTime = hit_data.EmissionTime
+    hit.timeOfFlight = hit_data.TimeOfFlight
     hit.moduleId = hit_data.Module
     hit.trackId = hit_data.Track
     hit.isDownward = hit_data.IsDownward
@@ -90,6 +102,10 @@ function update_photon_hit!(hit::PhotonHit, hit_data; Debug::Bool = false)
     if Debug
         hit.cherenkovTheta = hit_data.CherenkovTheta
         hit.cherenkovPhi = hit_data.CherenkovPhi
+        hit.pathlengthInRadiator = hit_data.PathlengthInRadiator
+        hit.GlobalX = hit_data.GlobalX
+        hit.GlobalY = hit_data.GlobalY
+        hit.GlobalZ = hit_data.GlobalZ
     end
 
     return hit
