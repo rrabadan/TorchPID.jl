@@ -70,6 +70,7 @@ function skim_events(root_file::String, particles_output::String, hits_output::S
     # Write particles to Parquet
     if !isempty(all_particles)
         particles_df = DataFrame(all_particles)
+        select!(particles_df, Not(:rotMatrix))  # Exclude rotMatrix field
         Arrow.write(particles_output * ".parquet", particles_df)
         println("Particles written to $(particles_output).parquet")
     end
