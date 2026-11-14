@@ -31,8 +31,8 @@ const MUON_MASS = 0.105658
 """Energy to wavelength conversion factor (nm * eV): 1239.84193"""
 const LAMBDA = 1239.84193
 
-"""Refractive index of air: 1.00029"""
-const N_AIR = 1.00029
+"""Refractive index of air: 1.000273"""
+const N_AIR = 1.000273
 
 """Surface roughness (nm): 0.5"""
 const ROUGHNESS = 0.5

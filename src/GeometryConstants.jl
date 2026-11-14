@@ -294,7 +294,7 @@ function Detector(
     gap = 0.5 * (width - active)
     n_xtotal = n_xpixels * n_detectors
     x_size = active / n_xpixels
-    y_size = width / n_ypixels
+    y_size = active / n_ypixels
     x_min = -radiator.half_width
     x_max = +radiator.half_width
     y_min = -0.5 * active

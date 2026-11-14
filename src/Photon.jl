@@ -163,7 +163,7 @@ function create_explicit_photon(
     sinthetac = sqrt(1.0 - costhetac^2)
 
     # photon direction
-    xdir, ydir, zdir, slope = _photon_direction(p, costhetac, sinthetac, phic)
+    xdir, ydir, zdir, slope = _photon_direction(particle, costhetac, sinthetac, phic)
 
     # critical angle
     sinsqthetacrit = (context.constants.N_AIR / nphase)^2
@@ -264,7 +264,8 @@ function create_approximate_photon(
     ngroup::Float64,
     energy::Float64,
     zemission::Float64,
-    phi::Float64,
+    cosphi::Float64,
+    sinphi::Float64,
     context::PhotonContext,
 )::Photon
 
@@ -273,7 +274,7 @@ function create_approximate_photon(
     sinthetac = sqrt(1.0 - costhetac^2)
 
     # photon direction
-    xdir, ydir, zdir, slope = _photon_direction(particle, costhetac, sinthetac, phi)
+    xdir, ydir, zdir, slope = _photon_direction(particle, costhetac, sinthetac, cosphi, sinphi)
 
     # emission point in z
     xpos, ypos, zpos = _photon_emission(particle, zemission, context)
@@ -305,6 +306,29 @@ function create_approximate_photon(
     )
 end
 
+function create_approximate_photon(
+    particle::Particle,
+    beta::Float64,
+    nphase::Float64,
+    ngroup::Float64,
+    energy::Float64,
+    zemission::Float64,
+    phi::Float64,
+    context::PhotonContext,
+)::Photon
+    return create_approximate_photon(
+        particle,
+        beta,
+        nphase,
+        ngroup,
+        energy,
+        zemission,
+        cos(phi),
+        sin(phi),
+        context,
+    )
+end
+
 """
     test_z_surface_roughness(photon::Photon, roughness::Float64, nreflec::Int)::Bool
 
@@ -321,9 +345,13 @@ The probability of passing decreases with number of reflections.
 - `Bool`: Whether the photon passes the surface roughness condition (true) or not (false).
 """
 function test_z_surface_roughness(photon::Photon, roughness::Float64, nreflec::Int)::Bool
-    c = π * photon.np * roughness / photon.lambda
+    c = 4.0 * π * photon.np * roughness * photon.zdir / photon.lambda
     r = exp(-c * c)
     return rand() < r^nreflec
+end
+
+function test_z_surface_roughness(photon::Photon, nreflec::Int)::Bool
+    return test_z_surface_roughness(photon, ROUGHNESS, nreflec)
 end
 
 """ 
@@ -369,31 +397,26 @@ function _photon_direction(
     p::Particle,
     costhetac::Float64,
     sinthetac::Float64,
-    phic::Float64,
+    cosphic::Float64,
+    sinphic::Float64,
 )::Tuple{Float64,Float64,Float64,Float64}
-    # photon direction
-    xprime = sinthetac * cos(phic)
-    yprime = sinthetac * sin(phic)
+    xprime = sinthetac * cosphic
+    yprime = sinthetac * sinphic
     zprime = costhetac
-
-    # rotate to the lab frame
-    #    uperp = sqrt(p.xDir^2 + p.yDir^2)
-    #    if uperp == 0.0
-    #        xdir = xprime
-    #        ydir = yprime
-    #        zdir = zprime
-    #    else
-    #        xdir = (p.xDir * p.zDir / uperp) * xprime -
-    #               (p.yDir / uperp) * yprime + p.xDir * zprime
-    #        ydir = (p.yDir * p.zDir / uperp) * xprime +
-    #               (p.xDir / uperp) * yprime + p.yDir * zprime
-    #        zdir = -uperp * xprime + p.zDir * zprime
-    #    end
 
     xdir, ydir, zdir = rotate(p, xprime, yprime, zprime)
     slope = abs(zdir / ydir)
 
     return xdir, ydir, zdir, slope
+end
+
+function _photon_direction(
+    p::Particle,
+    costhetac::Float64,
+    sinthetac::Float64,
+    phic::Float64,
+)::Tuple{Float64,Float64,Float64,Float64}
+    return _photon_direction(p, costhetac, sinthetac, cos(phic), sin(phic))
 end
 
 """ 

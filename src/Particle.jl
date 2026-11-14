@@ -118,7 +118,6 @@ function Particle(;
 )
     Particle(
         pid,
-        eventId,
         trackId,
         moduleId,
         xCoord,

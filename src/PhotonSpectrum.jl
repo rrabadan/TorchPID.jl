@@ -267,8 +267,11 @@ function spectrum_probability(
     d::PhotonSpectrumDistribution,
     energy::Float64,
 )::Float64
+    if !spectrum_above_threshold(d)
+        return 0.0
+    end
     n = floor(Int, (energy - s.emin) / s.dE) + 1
-    return (n ≥ 1 && n ≤ s.nbins) ? d.distribution[n] / d.yield_per_mm : 0.0
+    return (n ≥ 1 && n ≤ s.nbins) ? d.distribution[n] / (s.dE * d.yield_per_mm) : 0.0
 end
 
 """
@@ -292,6 +295,9 @@ function spectrum_random_sampling( #approximate
     d::PhotonSpectrumDistribution,
     rndm::Float64,
 )::Union{Tuple{Float64,Float64,Float64},Nothing}
+    if !spectrum_above_threshold(d)
+        return nothing
+    end
     i = searchsortedfirst(d.cumulative, rndm)
     if i <= length(d.cumulative) && d.cumulative[i] > rndm
         n = i

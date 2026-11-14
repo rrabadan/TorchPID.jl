@@ -133,20 +133,25 @@ end
 
 function TestBeamSimulator(config_file::String)
     config = YAML.load_file(config_file)
+    entry = get(config, "entry", Dict{String,Any}())
+    beam = get(config, "beam", Dict{String,Any}())
+    angle = get(beam, "angle", Dict{String,Any}())
+    timing = get(config, "timingRef", Dict{String,Any}())
+    particle = get(config, "particle", Dict{String,Any}())
     TestBeamSimulator(
-        entryX = get(config["entry"], "entryX", 100.0),
-        entryY = get(config["entry"], "entryY", 100.0),
-        sigmaEntryX = get(config["entry"], "sigmaEntryX", 1.0),
-        sigmaEntryY = get(config["entry"], "sigmaEntryY", 1.0),
-        momentumMean = get(config["beam"], "momentumMean", 5.0),
-        momentumSigma = get(config["beam"], "momentumSigma", 0.005),
-        thetaMean = get(config["beam"], "thetaMean", -0.001),
-        thetaSigma = get(config["beam"], "thetaSigma", 0.0002),
-        phiMean = get(config["beam"], "phiMean", -0.001),
-        phiSigma = get(config["beam"], "phiSigma", 0.0002),
-        timingDistance = get(config["timingRef"], "timingDistance", 8000.0),
-        timingResolution = get(config["timingRef"], "timingResolution", 0.015),
-        pid = get(config["particle"], "pid", 211),
+        entryX = Float64(get(entry, "x", get(entry, "entryX", 100.0))),
+        entryY = Float64(get(entry, "y", get(entry, "entryY", 100.0))),
+        sigmaEntryX = Float64(get(entry, "sx", get(entry, "sigmaEntryX", 1.0))),
+        sigmaEntryY = Float64(get(entry, "sy", get(entry, "sigmaEntryY", 1.0))),
+        momentumMean = Float64(get(beam, "momentum", get(beam, "momentumMean", 5.0))),
+        momentumSigma = Float64(get(beam, "smomentum", get(beam, "momentumSigma", 0.005))),
+        thetaMean = Float64(get(angle, "theta", get(beam, "thetaMean", -0.001))),
+        thetaSigma = Float64(get(angle, "stheta", get(beam, "thetaSigma", 0.0002))),
+        phiMean = Float64(get(angle, "phi", get(beam, "phiMean", -0.001))),
+        phiSigma = Float64(get(angle, "sphi", get(beam, "phiSigma", 0.0002))),
+        timingDistance = Float64(get(timing, "distance", get(timing, "timingDistance", 8000.0))),
+        timingResolution = Float64(get(timing, "resolution", get(timing, "timingResolution", 0.015))),
+        pid = Int64(get(beam, "id", get(particle, "pid", 211))),
     )
 end
 
@@ -360,21 +365,23 @@ function generate_photons(
     end
 
     npixels = length(pixels)
-    #println("Number of valid pixels: ", npixels)
 
-    xpixels = Vector{Float64}(undef, photon_yield)
-    ypixels = Vector{Float64}(undef, photon_yield)
-    tpixels = Vector{Float64}(undef, photon_yield)
-    mcp = Vector{Int}(undef, photon_yield)
-    mcpcolum = Vector{Int}(undef, photon_yield)
-    charge = Vector{Float64}(undef, photon_yield)
+    xpixels = Vector{Float64}(undef, npixels)
+    ypixels = Vector{Float64}(undef, npixels)
+    tpixels = Vector{Float64}(undef, npixels)
+    mcp = Vector{Int}(undef, npixels)
+    mcpcolum = Vector{Int}(undef, npixels)
+    charge = Vector{Float64}(undef, npixels)
 
-    xpixels = @view xpixels[1:npixels]
-    ypixels = @view ypixels[1:npixels]
-    tpixels = @view tpixels[1:npixels]
-    mcp = @view mcp[1:npixels]
-    mcpcolum = @view mcpcolum[1:npixels]
-    charge = @view charge[1:npixels]
+    @inbounds for i = 1:npixels
+        p = pixels[i]
+        xpixels[i] = Float64(p.x)
+        ypixels[i] = Float64(p.y)
+        tpixels[i] = Float64(p.t)
+        mcp[i] = div(p.x, fe.n_xpixels)
+        mcpcolum[i] = rem(p.x, fe.n_xpixels)
+        charge[i] = p.ch
+    end
 
     TestBeamPhotons(photon_yield, npixels, xpixels, ypixels, tpixels, mcp, mcpcolum, charge)
 end

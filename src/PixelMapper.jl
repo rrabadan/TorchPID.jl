@@ -111,7 +111,7 @@ and adjusts the position relative to the center of that MCP.
 """
 function get_mcp_xposition(x::Float64)::Float64
     xpos = x + 0.5 * RADIATOR.width
-    mcp = floor(Int, DETECTOR.width)
+    mcp = floor(Int, xpos / DETECTOR.width)
     xpos -= (0.5 + mcp) * DETECTOR.width
     return xpos
 end

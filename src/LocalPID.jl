@@ -20,7 +20,7 @@ function run_local_pid(
         for hypothesis in hypotheses
             mass = get_particle_mass(hypothesis)
             beta = particle_beta(particle, mass)
-            spectrum_distribution = PhotonSpectrumDistribution(spectrum, particle, beta)
+            spectrum_distribution = PhotonSpectrumDistribution(spectrum, beta)
             reset!(image)
             expected_yield = make_pattern(
                 particle,

@@ -6,6 +6,7 @@ using UnROOT
 using Distributions
 using Base.Threads
 using StaticArrays
+import Base: fill!
 
 export CONSTANTS
 export Focus, Detector, Mask, Signal

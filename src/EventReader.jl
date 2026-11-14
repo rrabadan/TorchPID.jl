@@ -258,6 +258,12 @@ function EventReader(
             false,
             false,
             false,
+            debugPhotons ? 0.0 : nothing,
+            debugPhotons ? 0.0 : nothing,
+            debugPhotons ? 0.0 : nothing,
+            debugPhotons ? 0.0 : nothing,
+            debugPhotons ? 0.0 : nothing,
+            debugPhotons ? 0.0 : nothing,
         )
     end
 
@@ -462,16 +468,38 @@ function get_hits_in_event(reader::EventReader, event_idx::Int)::Vector{PhotonHi
     count = reader.hit_counts[event_idx]
     istart = reader.hit_indices[event_idx]
 
-    # Pre-allocate the hits array
-    hits_view = view(reader.hitPool.data, 1:count)
+    hits = Vector{PhotonHit}(undef, count)
+    debug = reader.debugPhotons
 
     for i = 1:count
         hit_idx = istart + i - 1
         hit_data = reader.hits[hit_idx]
-        update_photon_hit!(hits_view[i], hit_data)
+        hits[i] = PhotonHit(
+            hit_data.LocalX,
+            hit_data.LocalY,
+            hit_data.LocalZ,
+            hit_data.ArrivalTime,
+            hit_data.Energy,
+            hit_data.EmissionX,
+            hit_data.EmissionY,
+            hit_data.EmissionZ,
+            hit_data.EmissionTime,
+            hit_data.TimeOfFlight,
+            hit_data.Module,
+            hit_data.Track,
+            hit_data.IsDownward,
+            hit_data.IsSurfaceScattered,
+            hit_data.IsRayleighScattered,
+            debug ? hit_data.CherenkovTheta : nothing,
+            debug ? hit_data.CherenkovPhi : nothing,
+            debug ? hit_data.PathlengthInRadiator : nothing,
+            debug ? hit_data.GlobalX : nothing,
+            debug ? hit_data.GlobalY : nothing,
+            debug ? hit_data.GlobalZ : nothing,
+        )
     end
 
-    return hits_view
+    return hits
 end
 
 #

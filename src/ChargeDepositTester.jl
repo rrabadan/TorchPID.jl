@@ -33,18 +33,17 @@ Each value represents the probability of a hit falling within that time bin.
 # Returns
 - `Vector{Float64}`: Vector containing probability values for time bins.
 """
-function _set_resolution(resolution::Float64)::Vector{Float64}
-    # time_cache = Vector{Float64}(undef, 2 * n_time + 1)
-    time_cache = Vector{Float64}(undef, 0)
+function _set_resolution(resolution::Float64, n_time::Int = 40)::Vector{Float64}
+    time_cache = Vector{Float64}(undef, 2 * n_time + 1)
 
     for i = -n_time:n_time
-        p = gaussian_integral(
+        p = _gaussian_integral(
             0.0,
             resolution,
             (i - 0.5) * DETECTOR.t_bin,
             (i + 0.5) * DETECTOR.t_bin,
         )
-        push!(time_cache, p)
+        time_cache[i+n_time+1] = p
     end
     return time_cache
 end
@@ -142,41 +141,43 @@ struct ChargeDepositTester
     yf::Vector{Float64}
 end
 
-function ChargeDepositTester(;
+function ChargeDepositTester(
+    detector::Detector = DETECTOR,
+    signal::SignalParameters = SIGNAL;
     n_time::Int = 40,
     n_space::Int = 100,
     charge_sharing::Bool = false,
     clustering::Bool = false,
 )
-    gain = SIGNAL.gain
-    threshold = SIGNAL.threshold
-    point_spread = SIGNAL.point_spread
-    resolution = SIGNAL.time_resolution
+    gain = signal.gain
+    threshold = signal.threshold
+    point_spread = signal.point_spread
+    resolution = signal.time_resolution
 
-    space_step = 0.1 * min(DETECTOR.x_size, DETECTOR.y_size)
+    space_step = 0.1 * min(detector.x_size, detector.y_size)
 
     xf = zeros(Float64, n_space)
     yf = zeros(Float64, n_space)
 
     for i = 1:n_space
         xf[i] =
-            _gaussian_integral(space_step * (i + 0.5), point_spread, 0.0, DETECTOR.x_size)
+            _gaussian_integral(space_step * (i - 0.5), point_spread, 0.0, detector.x_size)
         yf[i] =
-            _gaussian_integral(space_step * (i + 0.5), point_spread, 0.0, DETECTOR.y_size)
+            _gaussian_integral(space_step * (i - 0.5), point_spread, 0.0, detector.y_size)
     end
 
     n_xbins = _get_max_bins(
-        DETECTOR.x_size,
-        DETECTOR.y_size,
-        DETECTOR.n_xpixels,
+        detector.x_size,
+        detector.y_size,
+        detector.n_xpixels,
         point_spread,
         gain,
         threshold,
     )
     n_ybins = _get_max_bins(
-        DETECTOR.y_size,
-        DETECTOR.x_size,
-        DETECTOR.n_ypixels,
+        detector.y_size,
+        detector.x_size,
+        detector.n_ypixels,
         point_spread,
         gain,
         threshold,
@@ -188,8 +189,8 @@ function ChargeDepositTester(;
         p = _gaussian_integral(
             0.0,
             resolution,
-            (i - 0.5) * DETECTOR.t_bin,
-            (i + 0.5) * DETECTOR.t_bin,
+            (i - 0.5) * detector.t_bin,
+            (i + 0.5) * detector.t_bin,
         )
         time_cache[i+n_time+1] = p
     end
@@ -332,13 +333,13 @@ It adds random noise drawn from a Gaussian distribution with a standard deviatio
 """
 function smear_time(cdt::ChargeDepositTester, time::Float64)::Float64
     # Apply Gaussian smearing to the time
-    smeared_time = time + randn() * cdt.resolution
+    smeared_time = time + randn() * cdt.time_resolution
     return smeared_time
 end
 
 function smear_time(cdt::ChargeDepositTester, hit::HitCoordinate)::HitCoordinate
     # Apply Gaussian smearing to the time
-    smeared_time = hit.time + randn() * cdt.resolution
+    smeared_time = hit.t + randn() * cdt.time_resolution
     return HitCoordinate(hit.x, hit.y, smeared_time)
 end
 

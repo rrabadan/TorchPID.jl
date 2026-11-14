@@ -152,8 +152,8 @@ function _get_hits(
 
     offset = mcp * pixelmap.n_xpixels
 
-    # Sort the hits in descending order by the first element of the tuple (assumes hit tuple is (tpixel, charge))
-    sorted_hits = sort(data[(xpixel, ypixel)], by = first, rev = true)
+    # Sort the hits in ascending time order by the first element of the tuple (tpixel, charge)
+    sorted_hits = sort(data[(xpixel, ypixel)], by = first, rev = false)
 
     # If the first hit's t value is > 0, add it to the collection
     if sorted_hits[1][1] > 0
@@ -210,8 +210,8 @@ function _get_hits(
         return nothing
     end
     for y = 0:pixelmap.n_ypixels-1
-        if _is_pixelmap_occupied(mcpimage, xpixel, y)
-            pixelhits = _get_hits(mcpimage, mcp, n_deadtime, xpixel, y)
+        if _is_occupied(pixelmap, xpixel, y)
+            pixelhits = _get_hits(pixelmap, mcp, n_deadtime, xpixel, y)
             if pixelhits !== nothing
                 append!(hitcollection, pixelhits)
             end
@@ -289,7 +289,8 @@ function _fill_pixelmap!(
 end
 
 function _fill_pixelmap!(mcpimage::MCPImage, hit::PixelHit)
-    _fill_pixelmap!(mcpimage, hit.xpixel, hit.ypixel, hit.tpixel; charge = hit.charge)
+    local_x = hit.x % mcpimage.pixelmap.n_xpixels
+    _fill_pixelmap!(mcpimage, local_x, hit.y, hit.t; charge = hit.ch)
 end
 
 """
@@ -412,7 +413,8 @@ function find_pixels(
     cdt::ChargeDepositTester,
     xpos::Float64,
     ypos::Float64,
-)::Union{Nothing,Vector{PixelHit}}
+    time::Float64 = 0.0,
+)::Union{Nothing,SubArray{PixelHit,1,Vector{PixelHit},Tuple{UnitRange{Int64}},true}}
 
     mcp = get_mcp_number(xpos)
     xcentre = get_mcp_xpixel(xpos)
@@ -432,9 +434,9 @@ function find_pixels(
 
     # Define the coordinate limits for looping over pixels.
     ix_low = max(xcentre - nx, 0)
-    ix_upp = min(xcentre + nx, m_nx - 1)
+    ix_upp = min(xcentre + nx, fe.n_xpixels - 1)
     iy_low = max(ycentre - ny, 0)
-    iy_upp = min(ycentre + ny, m_ny - 1)
+    iy_upp = min(ycentre + ny, fe.n_ypixels - 1)
 
     # Maximum possible number of pixels.
     max_pixels = (ix_upp - ix_low + 1) * (iy_upp - iy_low + 1)
@@ -447,7 +449,7 @@ function find_pixels(
     x_size = fe.x_size
     y_size = fe.y_size
     n_xpixels = fe.n_xpixels
-    smear_time = fe.smear_time
+    do_smear_time = fe.smear_time
     # Loop over pixels in the defined ranges.
     @inbounds for ix = ix_low:ix_upp
         @inbounds for iy = iy_low:iy_upp
@@ -468,10 +470,10 @@ function find_pixels(
             # Check if the charge is over threshold.
             if charge_over_threshold(cdt, xval, xlow, xupp, ypos, ylow, yupp)
                 # Each hit is smeared independently.
-                tprime = smear_time ? smear_time(cdt, time) : time
+                tprime = do_smear_time ? smear_time(cdt, time) : time
 
                 # Get the time pixel (without bounds checking).
-                tpixel = get_tpixel_noheck(tprime)
+                tpixel = get_tpixel_nocheck(tprime)
 
                 # Compute the x-pixel in the module pixel coordinate system.
                 # (Assuming 'MCP' and Geometry.Detector.n_xpixels are defined.)
@@ -588,7 +590,7 @@ function add_photon!(
         end
 
         # Only look up pixels if mcp is valid
-        pixels = find_pixels(fe, cdt, xpos, ypos)
+        pixels = find_pixels(fe, cdt, xpos, ypos, time)
         if pixels !== nothing
             mcpimg = mcps[mcp+1] # should it be mcp+1 the index?
             for pixel in pixels

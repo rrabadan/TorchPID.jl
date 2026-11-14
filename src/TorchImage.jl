@@ -64,7 +64,7 @@ function fill_smeared!(
     x::Int,
     y::Int,
     t::Int,
-)::Union{Float64,Nothing}
+)::Bool
     image = acc.image
     if !is_validpixel(image, x, y, t)
         return false

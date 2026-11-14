@@ -64,7 +64,9 @@ function find_particles(
            (!pidalg.checkTkAcceptance || (pmin <= p.pMag <= pmax))
 
             moduleId = p.moduleId
-            push!(module_particles[moduleId], p)
+            if haskey(module_particles, moduleId)
+                push!(module_particles[moduleId], p)
+            end
         end
     end
     filter!(pair -> !isempty(pair.second), module_particles)
@@ -89,9 +91,11 @@ function find_coordinates(
         # Only process if it passes selection criteria
         if select_photon_hit(pidalg, RADIATOR, WEDGE, DETECTOR, MASK, p) &&
            test_photon(dht, p.energy)
-            moduleId = p.Module
-            #    hit = HitCoordinate(p.LocalX, p.LocalY, p.arrivalTime)
-            #    push!(module_hits[moduleId], hit)
+            moduleId = Int(p.moduleId)
+            if haskey(module_hits, moduleId)
+                hit = HitCoordinate(p.localX, p.localY, p.arrivalTime)
+                push!(module_hits[moduleId], hit)
+            end
         end
     end
 
@@ -113,7 +117,7 @@ function select_photon_hit(
            !(pidalg.removeFocusPhotons && photon_from_focus(photon, radiator, wedge)) &&
            !is_photon_masked(photon, mask) &&
            !(pidalg.blackenedBottom && photon.isDownward) &&
-           !(detector.t_window_min < photon.arrivalTime < detector.t_window_max)
+           (detector.t_window_min < photon.arrivalTime < detector.t_window_max)
 end
 
 function run_algorithm(

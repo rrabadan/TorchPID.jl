@@ -67,7 +67,7 @@ function project_pattern(
     spectrum::PhotonSpectrum,
     context::PhotonContext,
 )::Vector{HitCoordinate}
-    photonDistribution = PhotonSpectrumDistribution(spectrum, particle, beta)
+    photonDistribution = PhotonSpectrumDistribution(spectrum, beta)
     return project_pattern(particle, beta, mapper, spectrum, photonDistribution, context)
 end
 
@@ -117,11 +117,10 @@ struct RandomPoint
     sinPhi::Float64
 end
 
-function random_point()
-    point = (randn(), randn(), randn())
-    e = point[3]
-    emissionZ = point[2] * 10 # Convert to mm
-    phi = point[1] * 2 * π
+function random_point(radiator_depth::Float64 = RADIATOR.depth)
+    phi = rand() * 2 * π
+    emissionZ = rand() * radiator_depth
+    e = rand()
     cosPhi = cos(phi)
     sinPhi = sin(phi)
     return RandomPoint(e, emissionZ, phi, cosPhi, sinPhi)
@@ -158,7 +157,8 @@ function make_pattern(
             ngroup,
             energy,
             point.emissionZ,
-            point.phi,
+            point.cosPhi,
+            point.sinPhi,
             context,
         )
         time_offset = _get_time_offset(particle, beta, photon.zpos, particle.t0, context)
@@ -187,7 +187,7 @@ function make_pattern(
     context::PhotonContext,
     n_generations::Int = 1000000,
 )::Float64
-    photonDistribution = PhotonSpectrumDistribution(spectrum, particle, beta)
+    photonDistribution = PhotonSpectrumDistribution(spectrum, beta)
     return make_pattern(
         particle,
         beta,
