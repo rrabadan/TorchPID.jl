@@ -175,8 +175,6 @@ struct EventReader
     useTruth::Bool
     debugPhotons::Bool
     trackquality::Int
-
-    hitPool::ObjPool{PhotonHit}
 end
 
 """
@@ -240,33 +238,6 @@ function EventReader(
     track_indices[2:end] = cumsum(track_counts) .+ 1
     hit_indices[2:end] = cumsum(hit_counts) .+ 1
 
-    HitPool = ObjPool{PhotonHit}(maximum(hit_counts))
-    for i = 1:maximum(hit_counts)
-        HitPool.data[i] = PhotonHit(
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0,
-            0,
-            false,
-            false,
-            false,
-            debugPhotons ? 0.0 : nothing,
-            debugPhotons ? 0.0 : nothing,
-            debugPhotons ? 0.0 : nothing,
-            debugPhotons ? 0.0 : nothing,
-            debugPhotons ? 0.0 : nothing,
-            debugPhotons ? 0.0 : nothing,
-        )
-    end
-
     return EventReader(
         f,
         events,
@@ -281,7 +252,6 @@ function EventReader(
         useTruth,
         debugPhotons,
         trackQuality,
-        HitPool,
     )
 end
 
@@ -357,7 +327,6 @@ Creates a Particle object from truth information.
         data.True_Pathlength,
         data.True_Pathlength,
         data.True_Origin_T,
-        [1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0],
     )
 end
 
@@ -393,7 +362,6 @@ Creates a Particle object from reconstructed information.
         data.Reco_Pathlength,
         data.True_Pathlength,
         data.True_Origin_T,
-        [1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0],
     )
 end
 
@@ -533,14 +501,11 @@ Processes all events with a provided function.
 # Returns
 - Vector of results from the processor function
 """
-function process_all_events(reader::EventReader, processor_fn::Function)
-    results = Vector{Any}(undef, length(reader.events))
-
-    for (i, event_data) in enumerate(event_iterator(reader))
-        results[i] = processor_fn(event_data.event, event_data.particles, event_data.hits)
-    end
-
-    return results
+function process_all_events(reader::EventReader, processor_fn::F) where {F<:Function}
+    return [
+        processor_fn(event_data.event, event_data.particles, event_data.hits) for
+        event_data in event_iterator(reader)
+    ]
 end
 
 """
@@ -561,21 +526,15 @@ function process_events_batch(
     reader::EventReader,
     start_idx::Int,
     batch_size::Int,
-    processor_fn::Function,
-)
+    processor_fn::F,
+) where {F<:Function}
     end_idx = min(start_idx + batch_size - 1, length(reader.events))
-    actual_size = end_idx - start_idx + 1
-
-    results = Vector{Any}(undef, actual_size)
-
-    for i = 1:actual_size
-        event_idx = start_idx + i - 1
-        event_data = get_event_data(reader, event_idx)
-
-        results[i] = processor_fn(event_data.event, event_data.particles, event_data.hits)
-    end
-
-    return results
+    return [
+        begin
+            event_data = get_event_data(reader, event_idx)
+            processor_fn(event_data.event, event_data.particles, event_data.hits)
+        end for event_idx = start_idx:end_idx
+    ]
 end
 
 """
@@ -590,11 +549,17 @@ Processes all events in parallel with multithreading.
 # Returns
 - Vector of results from the processor function
 """
-function process_all_events_parallel(reader::EventReader, processor_fn::Function)
+function process_all_events_parallel(reader::EventReader, processor_fn::F) where {F<:Function}
     n_events = length(reader.events)
-    results = Vector{Any}(undef, n_events)
+    if n_events == 0
+        return Any[]
+    end
+    first_data = get_event_data(reader, 1)
+    first_res = processor_fn(first_data.event, first_data.particles, first_data.hits)
+    results = Vector{typeof(first_res)}(undef, n_events)
+    results[1] = first_res
 
-    Threads.@threads for i = 1:n_events
+    Threads.@threads for i = 2:n_events
         event_data = get_event_data(reader, i)
         results[i] = processor_fn(event_data.event, event_data.particles, event_data.hits)
     end
@@ -620,17 +585,21 @@ function process_events_batch_parallel(
     reader::EventReader,
     start_idx::Int,
     batch_size::Int,
-    processor_fn::Function,
-)
+    processor_fn::F,
+) where {F<:Function}
     end_idx = min(start_idx + batch_size - 1, length(reader.events))
     actual_size = end_idx - start_idx + 1
+    if actual_size <= 0
+        return Any[]
+    end
+    first_data = get_event_data(reader, start_idx)
+    first_res = processor_fn(first_data.event, first_data.particles, first_data.hits)
+    results = Vector{typeof(first_res)}(undef, actual_size)
+    results[1] = first_res
 
-    results = Vector{Any}(undef, actual_size)
-
-    Threads.@threads for i = 1:actual_size
+    Threads.@threads for i = 2:actual_size
         event_idx = start_idx + i - 1
         event_data = get_event_data(reader, event_idx)
-
         results[i] = processor_fn(event_data.event, event_data.particles, event_data.hits)
     end
 

@@ -222,4 +222,40 @@ using TorchPID
         @test TorchPID.select_photon_hit(pidalg, RADIATOR, WEDGE, DETECTOR, MASK, ph_out) == false
     end
 
+    @testset "12. Phase P1: Type Stability, isbits & Zero Allocations" begin
+        @test isbitstype(Particle)
+        @test isbitstype(PhotonHit)
+        @test isbitstype(PixelHit)
+        @test isbitstype(HitCoordinate)
+
+        acc = TorchImageAccumulator()
+        @test size(acc.image.data) == (DETECTOR.n_tpixels, DETECTOR.n_ypixels, DETECTOR.n_xtotal)
+        @test stride(acc.image.data, 1) == 1
+
+        # Warmup and check zero allocations & type inference on hot-path functions
+        @test (@inferred TorchPID.epotek_305_interpolator(3.5)) isa Float64
+        @test (@inferred TorchPID.mirror_reflect(3.5)) isa Float64
+        @test (@inferred TorchPID.QE_interpolator(3.5)) isa Float64
+        @test (@inferred get_particle_mass(211)) isa Float64
+
+        @test (@allocated TorchPID.epotek_305_interpolator(3.5)) == 0
+        @test (@allocated TorchPID.mirror_reflect(3.5)) == 0
+        @test (@allocated TorchPID.QE_interpolator(3.5)) == 0
+        @test (@allocated get_particle_mass(211)) == 0
+
+        p = (@inferred Particle(211, 0.0, 0.0, 10.0, 0.1, 0.2, sqrt(1.0 - 0.05), 1.0, 2.0, 9.746794, 10000.0, 0.0))
+        @test (@inferred rotate(p, 1.0, 2.0, 3.0)) isa Tuple{Float64,Float64,Float64}
+        @test (@allocated rotate(p, 1.0, 2.0, 3.0)) == 0
+
+        cdt = ChargeDepositTester()
+        TorchPID.fill_smeared!(acc, cdt, 5, 10, 50)
+        @test (@allocated TorchPID.fill_smeared!(acc, cdt, 5, 10, 50)) == 0
+
+        fe = FrontEnd(DETECTOR)
+        mcps = create_mcp_images(fe)
+        add_photon!(mcps, fe, cdt, 0.0, 0.0, 25.0)
+        reset!(mcps, fe)
+        @test (@allocated reset!(mcps, fe)) == 0
+    end
+
 end

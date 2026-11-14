@@ -163,13 +163,7 @@ end
 # Returns
 - `Float64`: Transmission probability value between 0 and 1.
 """
-function epotek_305_interpolator(energy_input::Float64)
-    lambda = 1240.0 / energy_input
-    if lambda < 200.0 || lambda > 800.0
-        return 0.0
-    end
-
-    T_epotek_305 = [
+const T_EPOTEK_305 = (
         0.998881599,
         0.998828541,
         0.998902983,
@@ -771,19 +765,25 @@ function epotek_305_interpolator(energy_input::Float64)
         0.007098442,
         0.007011981,
         0.007010913,
-    ]
+)
 
-    index = floor(Int, 800 - lambda) + 1
-
-    if index < 1 || index + 1 > 601
+function epotek_305_interpolator(energy_input::Float64)::Float64
+    lambda = 1240.0 / energy_input
+    if lambda < 200.0 || lambda > 800.0
         return 0.0
     end
 
-    e_left = 1240.0 / (800 - (index - 1))
-    e_right = 1240.0 / (800 - index)
+    index = floor(Int, 800.0 - lambda) + 1
+
+    if index < 1 || index + 1 > length(T_EPOTEK_305)
+        return 0.0
+    end
+
+    e_left = 1240.0 / (800.0 - (index - 1))
+    e_right = 1240.0 / (800.0 - index)
     delta = (energy_input - e_left) / (e_right - e_left)
 
-    return T_epotek_305[index] + (T_epotek_305[index+1] - T_epotek_305[index]) * delta
+    @inbounds return T_EPOTEK_305[index] + (T_EPOTEK_305[index+1] - T_EPOTEK_305[index]) * delta
 end
 
 """
@@ -800,13 +800,7 @@ end
 # Returns
 - `Float64`: Reflection probability value between 0 and 1.
 """
-function mirror_reflect(input_energy::Float64)
-    lambda = 1240.0 / input_energy
-    if lambda < 200.0 || lambda > 800.0
-        return 0.0
-    end
-
-    R_lambda = [
+const R_LAMBDA = (
         0.860,
         0.870,
         0.876,
@@ -868,10 +862,16 @@ function mirror_reflect(input_energy::Float64)
         0.8275,
         0.8225,
         0.817,
-    ]
+)
+
+function mirror_reflect(input_energy::Float64)::Float64
+    lambda = 1240.0 / input_energy
+    if lambda < 200.0 || lambda > 800.0
+        return 0.0
+    end
 
     index = floor(Int, (lambda - 200.0) / 10.0) + 1
-    if index < 1 || index + 1 > length(R_lambda)
+    if index < 1 || index + 1 > length(R_LAMBDA)
         return 0.0
     end
 
@@ -879,8 +879,7 @@ function mirror_reflect(input_energy::Float64)
     e_low = 1240.0 / (210.0 + 10.0 * (index - 1))
     delta = (input_energy - e_low) / (e_upp - e_low)
 
-    return R_lambda[index+1] + (R_lambda[index] - R_lambda[index+1]) * delta
-
+    @inbounds return R_LAMBDA[index+1] + (R_LAMBDA[index] - R_LAMBDA[index+1]) * delta
 end
 
 """
@@ -897,13 +896,7 @@ end
 # Returns
 - `Float64`: Quantum efficiency value between 0 and 1.
 """
-function QE_interpolator(input_energy::Float64)
-    lambda = 1240.0 / input_energy
-    if lambda < 200.0 || lambda > 800.0
-        return 0.0
-    end
-
-    QE = [
+const QE_TABLE = (
         0.208,
         0.282,
         0.281,
@@ -935,11 +928,17 @@ function QE_interpolator(input_energy::Float64)
         0.011,
         0.008,
         0.006,
-    ]
+)
+
+function QE_interpolator(input_energy::Float64)::Float64
+    lambda = 1240.0 / input_energy
+    if lambda < 200.0 || lambda > 800.0
+        return 0.0
+    end
 
     index = floor(Int, (lambda - 200.0) / 20.0) + 1
 
-    if index < 1 || index + 1 > length(QE)
+    if index < 1 || index + 1 > length(QE_TABLE)
         return 0.0
     end
 
@@ -947,5 +946,5 @@ function QE_interpolator(input_energy::Float64)
     e_low = 1240.0 / (220.0 + 20.0 * (index - 1))
     delta = (input_energy - e_low) / (e_upp - e_low)
 
-    return QE[index+1] + (QE[index] - QE[index+1]) * delta
+    @inbounds return QE_TABLE[index+1] + (QE_TABLE[index] - QE_TABLE[index+1]) * delta
 end

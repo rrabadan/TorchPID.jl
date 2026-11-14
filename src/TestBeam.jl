@@ -238,63 +238,63 @@ function generate_particles(
     constants::Constants,
     N::Int,
 )::Vector{TestBeamParticle}
-    # Generate the entry point using Normal distribution
-    entryX = tb.entryX .+ tb.sigmaEntryX .* randn(N)
-    entryY = tb.entryY .+ tb.sigmaEntryY .* randn(N)
-
-    entryX .-= radiator.half_width
-    entryY .-= 0.5 * radiator.height
-
-    # Generate the momentum
-    momentum = tb.momentumMean .+ tb.momentumSigma .* randn(N)
     mass = get_particle_mass(tb.pid)
-    energy = sqrt.(momentum .^ 2 .+ mass^2)
-    beta = momentum ./ energy
-
-    # Generate the angles
-    theta = tb.thetaMean .+ tb.thetaSigma .* randn(N)
-    phi = tb.phiMean .+ tb.phiSigma .* randn(N)
-
-    # Generate the direction
-    px = momentum .* sin.(theta) .* cos.(phi)
-    py = momentum .* sin.(theta) .* sin.(phi)
-    pz = momentum .* cos.(theta)
-
-    pathlength = tb.timingDistance ./ cos.(theta)
-    flightTime = pathlength ./ (beta .* constants.CLIGHT)
-
-    timingPositionX = entryX .- pathlength .* cos.(phi) .* sin.(theta)
-    timingPositionY = entryY .- pathlength .* sin.(phi) .* sin.(theta)
-
-    t0 = tb.timingResolution == 0 ? zeros(N) : tb.timingResolution .* randn(N)
-
-    xDir = px ./ momentum
-    yDir = py ./ momentum
-    zDir = pz ./ momentum
+    half_width = radiator.half_width
+    half_height = 0.5 * radiator.height
+    clight = constants.CLIGHT
+    has_timing_res = tb.timingResolution != 0.0
 
     particles = Vector{TestBeamParticle}(undef, N)
-    for i = 1:N
+    @inbounds for i = 1:N
+        ex = (tb.entryX + tb.sigmaEntryX * randn()) - half_width
+        ey = (tb.entryY + tb.sigmaEntryY * randn()) - half_height
+
+        mom = tb.momentumMean + tb.momentumSigma * randn()
+        en = hypot(mom, mass)
+        beta = mom / en
+
+        th = tb.thetaMean + tb.thetaSigma * randn()
+        ph = tb.phiMean + tb.phiSigma * randn()
+
+        sin_th, cos_th = sincos(th)
+        sin_ph, cos_ph = sincos(ph)
+
+        x_dir = sin_th * cos_ph
+        y_dir = sin_th * sin_ph
+        z_dir = cos_th
+
+        px = mom * x_dir
+        py = mom * y_dir
+        pz = mom * z_dir
+
+        plen = tb.timingDistance / cos_th
+        ftime = plen / (beta * clight)
+
+        tpos_x = ex - plen * x_dir
+        tpos_y = ey - plen * y_dir
+
+        t0 = has_timing_res ? tb.timingResolution * randn() : 0.0
+
         particle = Particle(
             tb.pid,
-            entryX[i],
-            entryY[i],
-            momentum[i],
-            xDir[i],
-            yDir[i],
-            zDir[i],
-            px[i],
-            py[i],
-            pz[i],
-            pathlength[i],
-            t0[i],
+            ex,
+            ey,
+            mom,
+            x_dir,
+            y_dir,
+            z_dir,
+            px,
+            py,
+            pz,
+            plen,
+            t0,
         )
-        initial_rotation!(particle)
         particles[i] = TestBeamParticle(
             particle,
-            energy[i],
-            beta[i],
-            (timingPositionX[i], timingPositionY[i]),
-            flightTime[i],
+            en,
+            beta,
+            (tpos_x, tpos_y),
+            ftime,
         )
     end
     return particles
@@ -305,8 +305,10 @@ end
         particle::TestBeamParticle,
         spectrum::PhotonSpectrum,
         mapper::PhotonMapper,
+        context::PhotonContext,
         fe::FrontEnd,
         cdt::ChargeDepositTester,
+        mcp_images::MCPImageArray = create_mcp_images(fe),
     )::Union{Nothing,TestBeamPhotons}
 
 `generate_photons` simulates and processes photons resulting from a particle interaction. 
@@ -319,8 +321,10 @@ If no valid pixel hits are detected, the function returns `nothing`.
 - `particle::TestBeamParticle`: The particle generating the photons.
 - `spectrum::PhotonSpectrum`: Spectrum parameters for photon generation.
 - `mapper::PhotonMapper`: Mapper for photon projection.
+- `context::PhotonContext`: Photon tracing context.
 - `fe::FrontEnd`: Front-end electronics configuration.
 - `cdt::ChargeDepositTester`: Configuration for charge deposit testing.
+- `mcp_images::MCPImageArray`: Optional pre-allocated MCP image array to reuse across events.
 
 # Returns
 - `Union{Nothing,TestBeamPhotons}`: Photon detection results, or `nothing` if no valid hits were detected.
@@ -332,6 +336,7 @@ function generate_photons(
     context::PhotonContext,
     fe::FrontEnd,
     cdt::ChargeDepositTester,
+    mcp_images::MCPImageArray = create_mcp_images(fe),
 )::Union{Nothing,TestBeamPhotons}
 
     # Generate the number of photons
@@ -345,16 +350,8 @@ function generate_photons(
         context,
     )
     photon_yield = length(photons)
-    #println("Photon yield: ", photon_yield)
-    #npixels = length(photons)
-    #xpixels = Vector{Float64}(undef, npixels)
-    #ypixels = Vector{Float64}(undef, npixels)
-    #for i = 1:npixels
-    #    xpixels[i] = photons[i].x
-    #    ypixels[i] = photons[i].y
-    #end
 
-    mcp_images = create_mcp_images(fe)
+    reset!(mcp_images, fe)
     for photon in photons
         add_photon!(mcp_images, fe, cdt, photon)
     end
@@ -396,8 +393,9 @@ function generate_photons_batch(
 )::Vector{Union{Nothing,TestBeamPhotons}}
     N = length(particles)
     results = Vector{Union{Nothing,TestBeamPhotons}}(undef, N)
+    mcp_images = create_mcp_images(fe)
     for i = 1:N
-        results[i] = generate_photons(particles[i], spectrum, mapper, context, fe, cdt)
+        results[i] = generate_photons(particles[i], spectrum, mapper, context, fe, cdt, mcp_images)
     end
     return results
 end

@@ -50,7 +50,95 @@ struct Particle
     pathlength::Float64
     truePathlength::Float64
     t0::Float64
-    rotMatrix::MMatrix{3,3,Float64,9}
+    rotMatrix::SMatrix{3,3,Float64,9}
+end
+
+@inline function _compute_rotation_matrix(
+    xDir::Float64,
+    yDir::Float64,
+    zDir::Float64,
+)::SMatrix{3,3,Float64,9}
+    uperp = sqrt(xDir^2 + yDir^2)
+    if uperp != 0.0
+        inv_uperp = 1.0 / uperp
+        return SMatrix{3,3,Float64,9}(
+            xDir * zDir * inv_uperp,
+            yDir * zDir * inv_uperp,
+            -uperp,
+            -yDir * inv_uperp,
+            xDir * inv_uperp,
+            0.0,
+            xDir,
+            yDir,
+            zDir,
+        )
+    else
+        return SMatrix{3,3,Float64,9}(
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+        )
+    end
+end
+
+function Particle(
+    pid::Integer,
+    trackId::Integer,
+    moduleId::Integer,
+    xCoord::Real,
+    yCoord::Real,
+    pMag::Real,
+    pMagTrue::Real,
+    xDir::Real,
+    yDir::Real,
+    zDir::Real,
+    truePX::Real,
+    truePY::Real,
+    truePZ::Real,
+    recoPX::Real,
+    recoPY::Real,
+    recoPZ::Real,
+    pathlength::Real,
+    truePathlength::Real,
+    t0::Real,
+    rotMatrix::AbstractMatrix{<:Real} = _compute_rotation_matrix(
+        Float64(xDir),
+        Float64(yDir),
+        Float64(zDir),
+    ),
+)
+    xd = Float64(xDir)
+    yd = Float64(yDir)
+    zd = Float64(zDir)
+    rm = rotMatrix isa SMatrix{3,3,Float64,9} ? rotMatrix : _compute_rotation_matrix(xd, yd, zd)
+    return Particle(
+        Int(pid),
+        Int(trackId),
+        Int(moduleId),
+        Float64(xCoord),
+        Float64(yCoord),
+        Float64(pMag),
+        Float64(pMagTrue),
+        xd,
+        yd,
+        zd,
+        Float64(truePX),
+        Float64(truePY),
+        Float64(truePZ),
+        Float64(recoPX),
+        Float64(recoPY),
+        Float64(recoPZ),
+        Float64(pathlength),
+        Float64(truePathlength),
+        Float64(t0),
+        rm,
+    )
 end
 
 """
@@ -104,18 +192,9 @@ function Particle(;
     pathlength::Float64 = 0.0,
     truePathlength::Float64 = 0.0,
     t0::Float64 = 0.0,
-    rotMatrix::MMatrix{3,3,Float64,9} = MMatrix{3,3,Float64,9}(
-        1.0,
-        0.0,
-        0.0,
-        0.0,
-        1.0,
-        0.0,
-        0.0,
-        0.0,
-        1.0,
-    ),
+    rotMatrix::Union{Nothing,AbstractMatrix{Float64}} = nothing,
 )
+    rm = isnothing(rotMatrix) ? _compute_rotation_matrix(xDir, yDir, zDir) : SMatrix{3,3,Float64,9}(rotMatrix)
     Particle(
         pid,
         trackId,
@@ -136,7 +215,7 @@ function Particle(;
         pathlength,
         truePathlength,
         t0,
-        rotMatrix,
+        rm,
     )
 end
 
@@ -156,8 +235,7 @@ function Particle(
 )
     trackId::Int = 0
     moduleId::Int = 0
-    rotMatrix::MMatrix{3,3,Float64,9} =
-        MMatrix{3,3,Float64,9}(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
+    rotMatrix = _compute_rotation_matrix(xDir, yDir, zDir)
 
     Particle(
         pid,
@@ -227,20 +305,8 @@ If the perpendicular component (uperp) is zero, the rotation matrix is left unch
 # Arguments
 - `p::Particle`: The particle instance whose rotation matrix will be initialized.
 """
-function initial_rotation!(p::Particle)
-    uperp::Float64 = sqrt(p.xDir^2 + p.yDir^2)
-
-    if uperp != 0
-        p.rotMatrix[1, 1] = p.xDir * p.zDir / uperp
-        p.rotMatrix[1, 2] = -p.yDir / uperp
-        p.rotMatrix[1, 3] = p.xDir
-        p.rotMatrix[2, 1] = p.yDir * p.zDir / uperp
-        p.rotMatrix[2, 2] = p.xDir / uperp
-        p.rotMatrix[2, 3] = p.yDir
-        p.rotMatrix[3, 1] = -uperp
-        p.rotMatrix[3, 2] = 0
-        p.rotMatrix[3, 3] = p.zDir
-    end
+@inline function initial_rotation!(p::Particle)
+    return p
 end
 
 """
@@ -258,17 +324,14 @@ This operation preserves the vector's magnitude while changing its orientation.
 # Returns
 - `Tuple{Float64, Float64, Float64}`: The rotated vector components in the global reference frame.
 """
-function rotate(
+@inline function rotate(
     p::Particle,
     x::Float64,
     y::Float64,
     z::Float64,
 )::Tuple{Float64,Float64,Float64}
-    return (
-        p.rotMatrix[1, 1] * x + p.rotMatrix[1, 2] * y + p.rotMatrix[1, 3] * z,
-        p.rotMatrix[2, 1] * x + p.rotMatrix[2, 2] * y + p.rotMatrix[2, 3] * z,
-        p.rotMatrix[3, 1] * x + p.rotMatrix[3, 2] * y + p.rotMatrix[3, 3] * z,
-    )
+    v = p.rotMatrix * SVector{3,Float64}(x, y, z)
+    return (v[1], v[2], v[3])
 end
 
 """
@@ -343,10 +406,17 @@ If no match is found, it returns `UNKNOWN` as the type and null properties.
 - `Tuple{ParticleType, ParticleProperty}`: A tuple containing the particle type and its properties.
 """
 function get_type_and_properties(p::Particle)
-    for (k, v) in PARTICLE_PROPERTIES
-        if v.pdgid == abs(p.pid)
-            return k, v
-        end
+    apid = abs(p.pid)
+    if apid == 211
+        return PION, PARTICLE_PROPERTIES[PION]
+    elseif apid == 321
+        return KAON, PARTICLE_PROPERTIES[KAON]
+    elseif apid == 2212
+        return PROTON, PARTICLE_PROPERTIES[PROTON]
+    elseif apid == 11
+        return ELECTRON, PARTICLE_PROPERTIES[ELECTRON]
+    elseif apid == 13
+        return MUON, PARTICLE_PROPERTIES[MUON]
     end
     return UNKNOWN, ParticleProperty("unknown", 0.0, 0)
 end
@@ -364,11 +434,18 @@ If no match is found, it returns a default mass of 0.0.
 # Returns
 - `Float64`: The mass of the particle in appropriate units, or 0.0 if not found.
 """
-function get_particle_mass(pid::Int64)::Float64
-    for (k, v) in PARTICLE_PROPERTIES
-        if v.pdgid == abs(pid)
-            return v.mass
-        end
+@inline function get_particle_mass(pid::Integer)::Float64
+    apid = abs(pid)
+    if apid == 211
+        return PION_MASS
+    elseif apid == 321
+        return KAON_MASS
+    elseif apid == 2212
+        return PROTON_MASS
+    elseif apid == 11
+        return ELECTRON_MASS
+    elseif apid == 13
+        return MUON_MASS
     end
     return 0.0
 end

@@ -20,14 +20,15 @@ Initializes an empty pixel map with the specified dimensions.
 ## Returns
 - `MCPPixelMap`: An initialized MCPPixelMap object with empty data.
 """
-mutable struct MCPPixelMap
-    data::Dict{Tuple{Int,Int},Vector{Tuple{Int,Float64}}}
+struct MCPPixelMap
+    data::Matrix{Vector{Tuple{Int,Float64}}}
     n_xpixels::Int
     n_ypixels::Int
 end
 
 function MCPPixelMap(n_xpixels::Int, n_ypixels::Int)::MCPPixelMap
-    MCPPixelMap(Dict{Tuple{Int,Int},Vector{Tuple{Int,Float64}}}(), n_xpixels, n_ypixels)
+    data = [Vector{Tuple{Int,Float64}}() for _ = 1:n_xpixels, _ = 1:n_ypixels]
+    MCPPixelMap(data, n_xpixels, n_ypixels)
 end
 
 """
@@ -83,15 +84,13 @@ A pixel is deemed occupied if its hit list is non-empty.
 - `Bool`: `true` if the pixel has at least one hit recorded; otherwise `false`.
 """
 function _is_occupied(pixelmap::MCPPixelMap, xpixel::Int, ypixel::Int)
-    data = pixelmap.data
     n_xpixels = pixelmap.n_xpixels
     n_ypixels = pixelmap.n_ypixels
     if (xpixel < 0) || (xpixel >= n_xpixels) || (ypixel < 0) || (ypixel >= n_ypixels)
         return false
     end
 
-    # Check if the pixel is occupied, accounting for missing keys
-    return haskey(data, (xpixel, ypixel)) && !isempty(data[(xpixel, ypixel)])
+    return !isempty(@inbounds pixelmap.data[xpixel + 1, ypixel + 1])
 end
 
 """
@@ -107,7 +106,10 @@ It iterates through all pixels and empties their hit lists, leaving the pixel ma
 - `Nothing`: The function modifies the input pixel map in place.
 """
 function _reset_pixelmap!(pixelmap::MCPPixelMap)
-    pixelmap.data = Dict{Tuple{Int,Int},Vector{Tuple{Int,Float64}}}()
+    @inbounds for hits in pixelmap.data
+        empty!(hits)
+    end
+    return nothing
 end
 
 """
@@ -118,7 +120,7 @@ end
 `_get_hits` retrieves hits from a specific pixel or set of pixels in the MCP image.  
 It extracts hits from the specified pixel location(s) and returns them as a collection of `PixelHit` objects.  
 If no hits are found, it returns `nothing`.  
-Hits are sorted in descending order of time, and only those with positive time values are included.  
+Hits are sorted in ascending order of time, and only those with positive time values are included.  
 The function respects the detector's dead time, excluding hits that occur within the dead time of a previous hit.  
 Each returned `PixelHit` includes global coordinates and associated charge information.
 
@@ -140,37 +142,34 @@ function _get_hits(
     ypixel::Int,
 )::Union{Nothing,Vector{PixelHit}}
 
-    data = pixelmap.data
-
-    # Check if the key exists in the pixelmap
-    if !haskey(data, (xpixel, ypixel)) || isempty(data[(xpixel, ypixel)])
-        # If the key does not exist or the pixel is empty, return nothing
+    if !_is_occupied(pixelmap, xpixel, ypixel)
         return nothing
     end
 
+    hits = @inbounds pixelmap.data[xpixel + 1, ypixel + 1]
     hitcollection = Vector{PixelHit}()
 
     offset = mcp * pixelmap.n_xpixels
 
-    # Sort the hits in ascending time order by the first element of the tuple (tpixel, charge)
-    sorted_hits = sort(data[(xpixel, ypixel)], by = first, rev = false)
+    # Sort the hits in-place in ascending time order by the first element of the tuple (tpixel, charge)
+    sort!(hits, by = first, rev = false)
 
     # If the first hit's t value is > 0, add it to the collection
-    if sorted_hits[1][1] > 0
+    if hits[1][1] > 0
         push!(
             hitcollection,
-            PixelHit(xpixel + offset, ypixel, sorted_hits[1][1], sorted_hits[1][2]),
+            PixelHit(xpixel + offset, ypixel, hits[1][1], hits[1][2]),
         )
     end
 
     # Loop over the rest of the hits and add them if the gap to the previous hit is sufficient
-    for t in Iterators.drop(eachindex(sorted_hits), 1)
-        tPixel = sorted_hits[t][1]
-        tPrev = sorted_hits[prevind(sorted_hits, t)][1]
+    @inbounds for t = 2:length(hits)
+        tPixel = hits[t][1]
+        tPrev = hits[t - 1][1]
         if (tPixel > 0) && (tPixel - tPrev > n_deadtime)
             push!(
                 hitcollection,
-                PixelHit(xpixel + offset, ypixel, tPixel, sorted_hits[t][2]),
+                PixelHit(xpixel + offset, ypixel, tPixel, hits[t][2]),
             )
         end
     end
@@ -185,13 +184,14 @@ function _get_hits(
 
     hitcollection = Vector{PixelHit}(undef, 0)
 
-    data = pixelmap.data
-    for keys in keys(data)
-        x = keys[1]
-        y = keys[2]
-        pixelhits = _get_hits(pixelmap, mcp, n_deadtime, x, y)
-        if pixelhits !== nothing
-            append!(hitcollection, pixelhits)
+    for y = 0:pixelmap.n_ypixels-1
+        for x = 0:pixelmap.n_xpixels-1
+            if _is_occupied(pixelmap, x, y)
+                pixelhits = _get_hits(pixelmap, mcp, n_deadtime, x, y)
+                if pixelhits !== nothing
+                    append!(hitcollection, pixelhits)
+                end
+            end
         end
     end
 
@@ -234,8 +234,7 @@ Each entry in a pixel's hit list represents a single hit.
 """
 function _get_number_hits(pixelmap::MCPPixelMap)::Int
     total_hits = 0
-    # Iterate over all entries in the pixelmap dictionary to count the total number of hits
-    for (_, hits) in pixelmap.data
+    @inbounds for hits in pixelmap.data
         total_hits += length(hits)
     end
     return total_hits
@@ -279,13 +278,8 @@ function _fill_pixelmap!(
        (ypixel >= mcpimage.pixelmap.n_ypixels)
         return
     end
-    key = (xpixel, ypixel)
-    pixelmap = mcpimage.pixelmap.data
-    if !haskey(pixelmap, key)
-        pixelmap[key] = Vector{Tuple{Int,Float64}}()
-    end
-    # Append the hit to the pixelmap
-    push!(pixelmap[key], (tpixel, charge))
+    @inbounds push!(mcpimage.pixelmap.data[xpixel + 1, ypixel + 1], (tpixel, charge))
+    return
 end
 
 function _fill_pixelmap!(mcpimage::MCPImage, hit::PixelHit)

@@ -1,14 +1,17 @@
-mutable struct PhotonHit
+@inline _to_f64(::Nothing) = NaN
+@inline _to_f64(x::Real) = Float64(x)
+
+struct PhotonHit
     localX::Float64
     localY::Float64
     localZ::Float64
     arrivalTime::Float64
     energy::Float64
-    emissionX::Union{Float64,Nothing}
-    emissionY::Union{Float64,Nothing}
-    emissionZ::Union{Float64,Nothing}
-    emissionTime::Union{Float64,Nothing}
-    timeOfFlight::Union{Float64,Nothing}
+    emissionX::Float64
+    emissionY::Float64
+    emissionZ::Float64
+    emissionTime::Float64
+    timeOfFlight::Float64
 
     moduleId::Int32
     trackId::Int32
@@ -17,12 +20,12 @@ mutable struct PhotonHit
     isSurfaceScattered::Bool
     isRayleighScattered::Bool
 
-    cherenkovTheta::Union{Float64,Nothing}
-    cherenkovPhi::Union{Float64,Nothing}
-    pathlengthInRadiator::Union{Float64,Nothing}
-    GlobalX::Union{Float64,Nothing}
-    GlobalY::Union{Float64,Nothing}
-    GlobalZ::Union{Float64,Nothing}
+    cherenkovTheta::Float64
+    cherenkovPhi::Float64
+    pathlengthInRadiator::Float64
+    GlobalX::Float64
+    GlobalY::Float64
+    GlobalZ::Float64
 
     function PhotonHit(
         localX,
@@ -40,35 +43,35 @@ mutable struct PhotonHit
         isDownward,
         isSurfaceScattered,
         isRayleighScattered,
-        cherenkovTheta = nothing,
-        cherenkovPhi = nothing,
-        pathlengthInRadiator = nothing,
-        GlobalX = nothing,
-        GlobalY = nothing,
-        GlobalZ = nothing,
+        cherenkovTheta = NaN,
+        cherenkovPhi = NaN,
+        pathlengthInRadiator = NaN,
+        GlobalX = NaN,
+        GlobalY = NaN,
+        GlobalZ = NaN,
     )
         return new(
-            localX,
-            localY,
-            localZ,
-            arrivalTime,
-            energy,
-            emissionX,
-            emissionY,
-            emissionZ,
-            emissionTime,
-            timeOfFlight,
-            moduleId,
-            trackId,
-            isDownward,
-            isSurfaceScattered,
-            isRayleighScattered,
-            cherenkovTheta,
-            cherenkovPhi,
-            pathlengthInRadiator,
-            GlobalX,
-            GlobalY,
-            GlobalZ,
+            Float64(localX),
+            Float64(localY),
+            Float64(localZ),
+            Float64(arrivalTime),
+            Float64(energy),
+            _to_f64(emissionX),
+            _to_f64(emissionY),
+            _to_f64(emissionZ),
+            _to_f64(emissionTime),
+            _to_f64(timeOfFlight),
+            Int32(moduleId),
+            Int32(trackId),
+            Bool(isDownward),
+            Bool(isSurfaceScattered),
+            Bool(isRayleighScattered),
+            _to_f64(cherenkovTheta),
+            _to_f64(cherenkovPhi),
+            _to_f64(pathlengthInRadiator),
+            _to_f64(GlobalX),
+            _to_f64(GlobalY),
+            _to_f64(GlobalZ),
         )
     end
 end
@@ -77,44 +80,33 @@ end
 """
     update_photon_hit!(hit::PhotonHit, hit_data; Debug::Bool=false)
 
-Update the properties of a `PhotonHit` object `hit` using the provided `hit_data`.
+Create an updated `PhotonHit` object using the provided `hit_data`.
 An optional `Debug` flag can be set to `true` for additional debugging information.
-
-# Arguments
-- `hit::PhotonHit`: The photon hit object to be updated.
-- `hit_data`: Data used to update the photon hit.
-- `Debug::Bool=false`: Optional flag to enable debugging output.
-
-# Returns
-Nothing. The function modifies the `hit` object in place.
 """
-function update_photon_hit!(hit::PhotonHit, hit_data; Debug::Bool = false)
-    hit.localX = hit_data.LocalX
-    hit.localY = hit_data.LocalY
-    hit.localZ = hit_data.LocalZ
-    hit.arrivalTime = hit_data.ArrivalTime
-    hit.energy = hit_data.Energy
-    hit.emissionX = hit_data.EmissionX
-    hit.emissionY = hit_data.EmissionY
-    hit.emissionZ = hit_data.EmissionZ
-    hit.emissionTime = hit_data.EmissionTime
-    hit.timeOfFlight = hit_data.TimeOfFlight
-    hit.moduleId = hit_data.Module
-    hit.trackId = hit_data.Track
-    hit.isDownward = hit_data.IsDownward
-    hit.isSurfaceScattered = hit_data.IsSurfaceScattered
-    hit.isRayleighScattered = hit_data.IsRayleighScattered
-
-    if Debug
-        hit.cherenkovTheta = hit_data.CherenkovTheta
-        hit.cherenkovPhi = hit_data.CherenkovPhi
-        hit.pathlengthInRadiator = hit_data.PathlengthInRadiator
-        hit.GlobalX = hit_data.GlobalX
-        hit.GlobalY = hit_data.GlobalY
-        hit.GlobalZ = hit_data.GlobalZ
-    end
-
-    return hit
+function update_photon_hit!(::PhotonHit, hit_data; Debug::Bool = false)
+    return PhotonHit(
+        hit_data.LocalX,
+        hit_data.LocalY,
+        hit_data.LocalZ,
+        hit_data.ArrivalTime,
+        hit_data.Energy,
+        hit_data.EmissionX,
+        hit_data.EmissionY,
+        hit_data.EmissionZ,
+        hit_data.EmissionTime,
+        hit_data.TimeOfFlight,
+        hit_data.Module,
+        hit_data.Track,
+        hit_data.IsDownward,
+        hit_data.IsSurfaceScattered,
+        hit_data.IsRayleighScattered,
+        Debug ? hit_data.CherenkovTheta : NaN,
+        Debug ? hit_data.CherenkovPhi : NaN,
+        Debug ? hit_data.PathlengthInRadiator : NaN,
+        Debug ? hit_data.GlobalX : NaN,
+        Debug ? hit_data.GlobalY : NaN,
+        Debug ? hit_data.GlobalZ : NaN,
+    )
 end
 
 """
