@@ -56,11 +56,7 @@ end
 end
 
 @inline function _sincos_phi_angle(
-    dx::Float64,
-    dy::Float64,
-    dz::Float64,
-    sintheta::Float64,
-    particle::Particle,
+    dx::Float64, dy::Float64, dz::Float64, sintheta::Float64, particle::Particle,
 )::Tuple{Float64,Float64}
     if sintheta <= 0.0
         return (0.0, 1.0)
@@ -73,15 +69,63 @@ end
     return (yprime * inv_sin, xprime * inv_sin)
 end
 
-@inline function _trace_center_photon(
-    particle::Particle,
-    beta::Float64,
-    energy::Float64,
-    sinphi::Float64,
-    cosphi::Float64,
-    mapper::PhotonMapper,
+@inline function _track_emission_midpoint(
+    particle::Particle, radiator::Radiator,
+)::Tuple{Float64,Float64,Float64}
+    z0 = 0.5 * radiator.depth
+    inv_zdir = 1.0 / particle.zDir
+    x0 = particle.xCoord + z0 * (particle.xDir * inv_zdir)
+    y0 = particle.yCoord + z0 * (particle.yDir * inv_zdir) + 0.5 * radiator.height
+    d0 = particle.pathlength + z0 * inv_zdir
+    return (x0, y0, d0)
+end
+
+@inline function _reconstruct_branch_path(
+    m::Int, xhit::Float64, x0::Float64, iy::Float64,
+    iy_sq_factor::Float64, abs_iy_over_slope::Float64,
+    particle::Particle, radiator::Radiator,
+)::Tuple{Float64,Float64,Float64,Float64,Float64,Bool}
+    ix = _x_offset(m, xhit, x0, radiator.width)
+    pathlength = sqrt(ix * ix + iy_sq_factor)
+    inv_path = 1.0 / pathlength
+    dx = ix * inv_path
+    dy = iy * inv_path
+    dz = abs_iy_over_slope * inv_path
+    costhetac = dx * particle.xDir + dy * particle.yDir + dz * particle.zDir
+    x_reflected = abs(x0 + ix) > radiator.half_width
+    return (pathlength, dx, dy, dz, costhetac, x_reflected)
+end
+
+@inline function _evaluate_branch_hypothesis(
+    beta::Float64, dist::PhotonSpectrumDistribution, costhetac::Float64,
+    dx::Float64, dy::Float64, dz::Float64, pathlength::Float64,
+    x_reflected::Bool, y_reflected::Bool, t0_particle::Float64, d0::Float64,
+    thit::Float64, time_window::Float64, n_air::Float64, clight::Float64,
     spectrum::PhotonSpectrum,
-    context::PhotonContext,
+)::Tuple{Bool,Float64,Float64,Float64}
+    nphase = 1.0 / (beta * costhetac)
+    if nphase <= spectrum.nphase_min || nphase >= spectrum.nphase_max
+        return (false, 0.0, 0.0, 0.0)
+    end
+    sinsqc = (n_air / nphase)^2
+    if (1.0 - dz * dz) <= sinsqc ||
+       (y_reflected && (1.0 - dy * dy) <= sinsqc) ||
+       (x_reflected && (1.0 - dx * dx) <= sinsqc)
+        return (false, 0.0, 0.0, 0.0)
+    end
+    energy, vgroup, prob_en = propagation_properties_nocheck(spectrum, dist, nphase)
+    t0 = t0_particle + d0 / (beta * clight)
+    rectime = t0 + pathlength / vgroup
+    if abs(rectime - thit) >= time_window
+        return (false, 0.0, 0.0, 0.0)
+    end
+    return (true, energy, rectime, prob_en)
+end
+
+@inline function _trace_center_photon(
+    particle::Particle, beta::Float64, energy::Float64,
+    sinphi::Float64, cosphi::Float64, mapper::PhotonMapper,
+    spectrum::PhotonSpectrum, context::PhotonContext,
 )::Union{HitCoordinate,Nothing}
     nphase = spectrum_nphase(spectrum, energy)
     ngroup = spectrum_ngroup(spectrum, energy)
@@ -90,15 +134,7 @@ end
     end
     emission_z = 0.5 * context.radiator.depth
     photon = create_approximate_photon(
-        particle,
-        beta,
-        nphase,
-        ngroup,
-        energy,
-        emission_z,
-        cosphi,
-        sinphi,
-        context,
+        particle, beta, nphase, ngroup, energy, emission_z, cosphi, sinphi, context,
     )
     toffset = _get_time_offset(particle, beta, photon.zpos, particle.t0, context)
     return trace_photon(mapper, photon, toffset)
@@ -127,15 +163,9 @@ end
 end
 
 @inline function photon_jacobian(
-    particle::Particle,
-    beta::Float64,
-    hit::HitCoordinate,
-    energy::Float64,
-    sinphi::Float64,
-    cosphi::Float64,
-    mapper::PhotonMapper,
-    spectrum::PhotonSpectrum,
-    context::PhotonContext,
+    particle::Particle, beta::Float64, hit::HitCoordinate,
+    energy::Float64, sinphi::Float64, cosphi::Float64,
+    mapper::PhotonMapper, spectrum::PhotonSpectrum, context::PhotonContext,
 )::Float64
     dE = spectrum.dE
     dphi = 1.0e-6
@@ -144,24 +174,14 @@ end
     h1 = _trace_center_photon(particle, beta, energy - dE, sinphi, cosphi, mapper, spectrum, context)
     h2 = _trace_center_photon(particle, beta, energy + dE, sinphi, cosphi, mapper, spectrum, context)
     h3 = _trace_center_photon(
-        particle,
-        beta,
-        energy,
-        sinphi * cosdphi - cosphi * sindphi,
-        cosphi * cosdphi + sinphi * sindphi,
-        mapper,
-        spectrum,
-        context,
+        particle, beta, energy,
+        sinphi * cosdphi - cosphi * sindphi, cosphi * cosdphi + sinphi * sindphi,
+        mapper, spectrum, context,
     )
     h4 = _trace_center_photon(
-        particle,
-        beta,
-        energy,
-        sinphi * cosdphi + cosphi * sindphi,
-        cosphi * cosdphi - sinphi * sindphi,
-        mapper,
-        spectrum,
-        context,
+        particle, beta, energy,
+        sinphi * cosdphi + cosphi * sindphi, cosphi * cosdphi - sinphi * sindphi,
+        mapper, spectrum, context,
     )
 
     dx_dE, dy_dE = _finite_diff_xy(hit, h1, h2, dE)
@@ -171,19 +191,11 @@ end
 end
 
 @inline function _mapped_photon_pdf(
-    particle::Particle,
-    beta::Float64,
-    hit::HitCoordinate,
-    energy::Float64,
-    rectime::Float64,
-    sinphic::Float64,
-    cosphic::Float64,
-    pathlength::Float64,
-    prob_energy::Float64,
-    mapper::PhotonMapper,
-    spectrum::PhotonSpectrum,
-    signal::SignalParameters,
-    context::PhotonContext,
+    particle::Particle, beta::Float64, hit::HitCoordinate,
+    energy::Float64, rectime::Float64, sinphic::Float64, cosphic::Float64,
+    pathlength::Float64, prob_energy::Float64,
+    mapper::PhotonMapper, spectrum::PhotonSpectrum,
+    signal::SignalParameters, context::PhotonContext,
 )::Float64
     if energy < spectrum.emin || energy > spectrum.emax || prob_energy <= 0.0
         return 0.0
@@ -230,19 +242,13 @@ pair across all 26 reflection branches in registers.
     n_air = context.constants.N_AIR
     clight = context.constants.CLIGHT
 
-    z0 = 0.5 * radiator.depth
-    x0 = particle.xCoord + z0 * (particle.xDir / particle.zDir)
-    y0 = particle.yCoord + z0 * (particle.yDir / particle.zDir) + 0.5 * radiator.height
-    d0 = particle.pathlength + (z0 / particle.zDir)
-    t0 = particle.t0 + d0 / (beta * clight)
-
+    x0, y0, d0 = _track_emission_midpoint(particle, radiator)
     max_costhetac = 1.0 / (beta * spectrum.nphase_min)
     min_costhetac = 1.0 / (beta * spectrum.nphase_max)
 
     inv_slope_sq_plus_1 = 1.0 + 1.0 / (slope * slope)
     ny_branches = (cfg.is_blackened_bottom || mapper.blackened_bottom) ? 1 : 2
     nx = cfg.nx_reflections
-
     total_prob = 0.0
 
     @inbounds for ky = 1:ny_branches
@@ -252,55 +258,24 @@ pair across all 26 reflection branches in registers.
         abs_iy_over_slope = abs(iy / slope)
 
         for m = -nx:nx
-            ix = _x_offset(m, hit.x, x0, radiator.width)
-            pathlength = sqrt(ix * ix + iy_sq_factor)
-            inv_path = 1.0 / pathlength
-
-            dx = ix * inv_path
-            dy = iy * inv_path
-            dz = abs_iy_over_slope * inv_path
-
-            costhetac = dx * particle.xDir + dy * particle.yDir + dz * particle.zDir
+            pathlength, dx, dy, dz, costhetac, x_reflected = _reconstruct_branch_path(
+                m, hit.x, x0, iy, iy_sq_factor, abs_iy_over_slope, particle, radiator,
+            )
             if costhetac < min_costhetac || costhetac > max_costhetac
                 continue
             end
 
-            nphase = 1.0 / (beta * costhetac)
-            if nphase <= spectrum.nphase_min || nphase >= spectrum.nphase_max
-                continue
-            end
-
-            sinsqc = (n_air / nphase)^2
-            if (1.0 - dz * dz) <= sinsqc
-                continue
-            end
-            if y_reflected && ((1.0 - dy * dy) <= sinsqc)
-                continue
-            end
-            x_reflected = abs(x0 + ix) > radiator.half_width
-            if x_reflected && ((1.0 - dx * dx) <= sinsqc)
-                continue
-            end
-
-            energy, vgroup, prob_en = propagation_properties_nocheck(spectrum, distribution, nphase)
-            rectime = t0 + pathlength / vgroup
-            if abs(rectime - hit.t) < cfg.time_window
+            valid, energy, rectime, prob_en = _evaluate_branch_hypothesis(
+                beta, distribution, costhetac, dx, dy, dz, pathlength,
+                x_reflected, y_reflected, particle.t0, d0, hit.t,
+                cfg.time_window, n_air, clight, spectrum,
+            )
+            if valid
                 sinthetac = sqrt(max(0.0, 1.0 - costhetac * costhetac))
                 sinphic, cosphic = _sincos_phi_angle(dx, dy, dz, sinthetac, particle)
                 total_prob += _mapped_photon_pdf(
-                    particle,
-                    beta,
-                    hit,
-                    energy,
-                    rectime,
-                    sinphic,
-                    cosphic,
-                    pathlength,
-                    prob_en,
-                    mapper,
-                    spectrum,
-                    signal,
-                    context,
+                    particle, beta, hit, energy, rectime, sinphic, cosphic,
+                    pathlength, prob_en, mapper, spectrum, signal, context,
                 )
             end
         end
@@ -341,11 +316,7 @@ once per reflection branch in registers and immediately evaluates all mass hypot
     clight = context.constants.CLIGHT
     nhypos = length(betas)
 
-    z0 = 0.5 * radiator.depth
-    x0 = particle.xCoord + z0 * (particle.xDir / particle.zDir)
-    y0 = particle.yCoord + z0 * (particle.yDir / particle.zDir) + 0.5 * radiator.height
-    d0 = particle.pathlength + (z0 / particle.zDir)
-
+    x0, y0, d0 = _track_emission_midpoint(particle, radiator)
     inv_slope_sq_plus_1 = 1.0 + 1.0 / (slope * slope)
     ny_branches = (cfg.is_blackened_bottom || mapper.blackened_bottom) ? 1 : 2
     nx = cfg.nx_reflections
@@ -357,20 +328,13 @@ once per reflection branch in registers and immediately evaluates all mass hypot
         abs_iy_over_slope = abs(iy / slope)
 
         for m = -nx:nx
-            ix = _x_offset(m, hit.x, x0, radiator.width)
-            pathlength = sqrt(ix * ix + iy_sq_factor)
-            inv_path = 1.0 / pathlength
-
-            dx = ix * inv_path
-            dy = iy * inv_path
-            dz = abs_iy_over_slope * inv_path
-
-            costhetac = dx * particle.xDir + dy * particle.yDir + dz * particle.zDir
+            pathlength, dx, dy, dz, costhetac, x_reflected = _reconstruct_branch_path(
+                m, hit.x, x0, iy, iy_sq_factor, abs_iy_over_slope, particle, radiator,
+            )
             if costhetac <= 0.0 || costhetac >= 1.0
                 continue
             end
 
-            x_reflected = abs(x0 + ix) > radiator.half_width
             sinthetac = -1.0
             sinphic = 0.0
             cosphic = 1.0
@@ -381,46 +345,19 @@ once per reflection branch in registers and immediately evaluates all mass hypot
                     continue
                 end
                 beta = betas[h]
-                nphase = 1.0 / (beta * costhetac)
-                if nphase <= spectrum.nphase_min || nphase >= spectrum.nphase_max
-                    continue
-                end
-
-                sinsqc = (n_air / nphase)^2
-                if (1.0 - dz * dz) <= sinsqc
-                    continue
-                end
-                if y_reflected && ((1.0 - dy * dy) <= sinsqc)
-                    continue
-                end
-                if x_reflected && ((1.0 - dx * dx) <= sinsqc)
-                    continue
-                end
-
-                dist = distributions[h]
-                energy, vgroup, prob_en = propagation_properties_nocheck(spectrum, dist, nphase)
-                t0 = particle.t0 + d0 / (beta * clight)
-                rectime = t0 + pathlength / vgroup
-
-                if abs(rectime - hit.t) < cfg.time_window
+                valid, energy, rectime, prob_en = _evaluate_branch_hypothesis(
+                    beta, distributions[h], costhetac, dx, dy, dz, pathlength,
+                    x_reflected, y_reflected, particle.t0, d0, hit.t,
+                    cfg.time_window, n_air, clight, spectrum,
+                )
+                if valid
                     if sinthetac < 0.0
                         sinthetac = sqrt(max(0.0, 1.0 - costhetac * costhetac))
                         sinphic, cosphic = _sincos_phi_angle(dx, dy, dz, sinthetac, particle)
                     end
                     pdf_val = _mapped_photon_pdf(
-                        particle,
-                        beta,
-                        hit,
-                        energy,
-                        rectime,
-                        sinphic,
-                        cosphic,
-                        pathlength,
-                        prob_en,
-                        mapper,
-                        spectrum,
-                        signal,
-                        context,
+                        particle, beta, hit, energy, rectime, sinphic, cosphic,
+                        pathlength, prob_en, mapper, spectrum, signal, context,
                     )
                     if pdf_val > 0.0
                         sig_prob[hit_idx, track_idx, h] += T(pdf_val * inv_norm)
@@ -457,12 +394,7 @@ function map_hit(
     n_air = context.constants.N_AIR
     clight = context.constants.CLIGHT
 
-    z0 = 0.5 * radiator.depth
-    x0 = particle.xCoord + z0 * (particle.xDir / particle.zDir)
-    y0 = particle.yCoord + z0 * (particle.yDir / particle.zDir) + 0.5 * radiator.height
-    d0 = particle.pathlength + (z0 / particle.zDir)
-    t0 = particle.t0 + d0 / (beta * clight)
-
+    x0, y0, d0 = _track_emission_midpoint(particle, radiator)
     max_costhetac = 1.0 / (beta * spectrum.nphase_min)
     min_costhetac = 1.0 / (beta * spectrum.nphase_max)
 
@@ -475,45 +407,30 @@ function map_hit(
     for ky = 1:ny_branches
         iy = (ky == 1) ? (ypath - y0) : (-ypath - y0)
         y_reflected = (ky == 2)
-        for m = -nx:nx
-            ix = _x_offset(m, hit.x, x0, radiator.width)
-            pathlength = sqrt(ix * ix + (iy * iy) * inv_slope_sq_plus_1)
-            dx = ix / pathlength
-            dy = iy / pathlength
-            dz = abs(iy / slope) / pathlength
+        iy_sq_factor = (iy * iy) * inv_slope_sq_plus_1
+        abs_iy_over_slope = abs(iy / slope)
 
-            costhetac = dx * particle.xDir + dy * particle.yDir + dz * particle.zDir
+        for m = -nx:nx
+            pathlength, dx, dy, dz, costhetac, x_reflected = _reconstruct_branch_path(
+                m, hit.x, x0, iy, iy_sq_factor, abs_iy_over_slope, particle, radiator,
+            )
             if costhetac < min_costhetac || costhetac > max_costhetac
                 continue
             end
-            nphase = 1.0 / (beta * costhetac)
-            if nphase <= spectrum.nphase_min || nphase >= spectrum.nphase_max
-                continue
-            end
-            sinsqc = (n_air / nphase)^2
-            if (1.0 - dz * dz) <= sinsqc ||
-               (y_reflected && (1.0 - dy * dy) <= sinsqc) ||
-               (abs(x0 + ix) > radiator.half_width && (1.0 - dx * dx) <= sinsqc)
-                continue
-            end
-            energy, vgroup, prob_en = propagation_properties_nocheck(spectrum, distribution, nphase)
-            rectime = t0 + pathlength / vgroup
-            if abs(rectime - hit.t) < cfg.time_window
+
+            valid, energy, rectime, prob_en = _evaluate_branch_hypothesis(
+                beta, distribution, costhetac, dx, dy, dz, pathlength,
+                x_reflected, y_reflected, particle.t0, d0, hit.t,
+                cfg.time_window, n_air, clight, spectrum,
+            )
+            if valid
                 sinthetac = sqrt(max(0.0, 1.0 - costhetac * costhetac))
                 sinphic, cosphic = _sincos_phi_angle(dx, dy, dz, sinthetac, particle)
                 push!(
                     photons,
                     MappedPhoton(
-                        rectime,
-                        costhetac,
-                        sinphic,
-                        cosphic,
-                        energy,
-                        dx,
-                        dy,
-                        dz,
-                        pathlength,
-                        prob_en,
+                        rectime, costhetac, sinphic, cosphic, energy,
+                        dx, dy, dz, pathlength, prob_en,
                     ),
                 )
             end

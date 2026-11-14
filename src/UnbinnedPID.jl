@@ -167,24 +167,68 @@ const PIXEL_QUAD_WEIGHTS = (0.25, 0.25, 0.25, 0.25, 0.5, 0.5, 0.5, 0.5, 1.0)
             inv_n = inv_norms[h]
             if inv_n > 0.0
                 p = hit_signal_probability(
-                    particle,
-                    betas[h],
-                    distributions[h],
-                    sub_hit,
-                    cfg,
-                    mapper,
-                    spectrum,
-                    signal,
-                    context,
-                    wedge;
-                    slope = slope,
-                    ypath = ypath,
+                    particle, betas[h], distributions[h], sub_hit,
+                    cfg, mapper, spectrum, signal, context, wedge;
+                    slope = slope, ypath = ypath,
                 )
                 sig_prob[pixel_idx, track_idx, h] += T(w * p * inv_n)
             end
         end
     end
     return nothing
+end
+
+function _prepare_event_probability!(
+    event_prob::EventProbability{T},
+    particles::AbstractVector{Particle},
+    hits::AbstractVector,
+    hypotheses::AbstractVector{<:Integer},
+    spectrum::PhotonSpectrum,
+    mapper::PhotonMapper,
+    background::AbstractBackgroundModel,
+    context::PhotonContext,
+    detector::Detector,
+    n_gen::Int,
+    random_points::Union{AbstractVector{RandomPoint},Nothing},
+) where {T<:AbstractFloat}
+    ntracks = length(particles)
+    nhits = length(hits)
+    npids = length(hypotheses)
+
+    fill!(event_prob.yields, zero(T))
+    fill!(event_prob.sig_prob, zero(T))
+    fill_bkg_probabilities!(event_prob.bkg_prob, background, hits)
+
+    pts =
+        random_points === nothing ?
+        [random_point(context.radiator.depth) for _ = 1:n_gen] : random_points
+
+    betas = Matrix{Float64}(undef, npids, ntracks)
+    distributions = Matrix{PhotonSpectrumDistribution}(undef, npids, ntracks)
+    inv_norms = zeros(Float64, npids, ntracks)
+
+    @inbounds for t = 1:ntracks
+        p = particles[t]
+        plen = context.radiator.depth / p.zDir
+        for h = 1:npids
+            mass = get_particle_mass(Int(hypotheses[h]))
+            beta = particle_beta(p, mass)
+            dist = PhotonSpectrumDistribution(spectrum, beta)
+            betas[h, t] = beta
+            distributions[h, t] = dist
+
+            eff = pattern_efficiency(
+                p, beta, mapper, spectrum, dist, context, detector;
+                n_photons = n_gen, random_points = pts,
+            )
+            if eff > 0.0
+                inv_norms[h, t] = 1.0 / eff
+                event_prob.yields[t, h] = T(spectrum_yield(dist, plen) * eff)
+            end
+        end
+    end
+
+    return (betas, distributions, inv_norms)
 end
 
 function compute_event_probability!(
@@ -207,18 +251,12 @@ function compute_event_probability!(
     ntracks = length(particles)
     nhits = length(hits)
     npids = length(hypotheses)
-
-    fill!(event_prob.yields, zero(T))
-    fill!(event_prob.sig_prob, zero(T))
-    fill_bkg_probabilities!(event_prob.bkg_prob, background, hits)
-
     if ntracks == 0 || nhits == 0 || npids == 0
+        fill!(event_prob.yields, zero(T))
+        fill!(event_prob.sig_prob, zero(T))
+        fill_bkg_probabilities!(event_prob.bkg_prob, background, hits)
         return event_prob
     end
-
-    pts =
-        random_points === nothing ?
-        [random_point(context.radiator.depth) for _ = 1:n_gen] : random_points
 
     # Precompute focus slopes and ypaths once per hit
     slopes = Vector{Float64}(undef, nhits)
@@ -229,38 +267,10 @@ function compute_event_probability!(
         ypaths[i] = focus_ypath(cfg, y, context.radiator, wedge)
     end
 
-    # Precompute distributions, efficiencies, and yields per (track, hypothesis)
-    betas = Matrix{Float64}(undef, npids, ntracks)
-    distributions = Matrix{PhotonSpectrumDistribution}(undef, npids, ntracks)
-    inv_norms = zeros(Float64, npids, ntracks)
-
-    @inbounds for t = 1:ntracks
-        p = particles[t]
-        plen = context.radiator.depth / p.zDir
-        for h = 1:npids
-            mass = get_particle_mass(Int(hypotheses[h]))
-            beta = particle_beta(p, mass)
-            dist = PhotonSpectrumDistribution(spectrum, beta)
-            betas[h, t] = beta
-            distributions[h, t] = dist
-
-            eff = pattern_efficiency(
-                p,
-                beta,
-                mapper,
-                spectrum,
-                dist,
-                context,
-                detector;
-                n_photons = n_gen,
-                random_points = pts,
-            )
-            if eff > 0.0
-                inv_norms[h, t] = 1.0 / eff
-                event_prob.yields[t, h] = T(spectrum_yield(dist, plen) * eff)
-            end
-        end
-    end
+    betas, distributions, inv_norms = _prepare_event_probability!(
+        event_prob, particles, hits, hypotheses, spectrum, mapper,
+        background, context, detector, n_gen, random_points,
+    )
 
     # Parallel evaluation over hits (stride-1 dimension) and tracks
     if threaded && nhits * ntracks > 16 && Threads.nthreads() > 1
@@ -270,21 +280,10 @@ function compute_event_probability!(
             yp = @inbounds ypaths[i]
             for t = 1:ntracks
                 accumulate_hit_signal_probs!(
-                    event_prob.sig_prob,
-                    i,
-                    t,
-                    hit,
-                    sl,
-                    yp,
+                    event_prob.sig_prob, i, t, hit, sl, yp,
                     @inbounds(particles[t]),
-                    @view(betas[:, t]),
-                    @view(distributions[:, t]),
-                    @view(inv_norms[:, t]),
-                    cfg,
-                    mapper,
-                    spectrum,
-                    signal,
-                    context,
+                    @view(betas[:, t]), @view(distributions[:, t]), @view(inv_norms[:, t]),
+                    cfg, mapper, spectrum, signal, context,
                 )
             end
         end
@@ -296,21 +295,9 @@ function compute_event_probability!(
             n_view = @view inv_norms[:, t]
             for i = 1:nhits
                 accumulate_hit_signal_probs!(
-                    event_prob.sig_prob,
-                    i,
-                    t,
-                    hits[i],
-                    slopes[i],
-                    ypaths[i],
-                    p,
-                    b_view,
-                    d_view,
-                    n_view,
-                    cfg,
-                    mapper,
-                    spectrum,
-                    signal,
-                    context,
+                    event_prob.sig_prob, i, t, hits[i], slopes[i], ypaths[i],
+                    p, b_view, d_view, n_view,
+                    cfg, mapper, spectrum, signal, context,
                 )
             end
         end
@@ -339,71 +326,26 @@ function compute_event_probability!(
     ntracks = length(particles)
     nhits = length(pixels)
     npids = length(hypotheses)
-
-    fill!(event_prob.yields, zero(T))
-    fill!(event_prob.sig_prob, zero(T))
-    fill_bkg_probabilities!(event_prob.bkg_prob, background, pixels)
-
     if ntracks == 0 || nhits == 0 || npids == 0
+        fill!(event_prob.yields, zero(T))
+        fill!(event_prob.sig_prob, zero(T))
+        fill_bkg_probabilities!(event_prob.bkg_prob, background, pixels)
         return event_prob
     end
 
-    pts =
-        random_points === nothing ?
-        [random_point(context.radiator.depth) for _ = 1:n_gen] : random_points
-
-    betas = Matrix{Float64}(undef, npids, ntracks)
-    distributions = Matrix{PhotonSpectrumDistribution}(undef, npids, ntracks)
-    inv_norms = zeros(Float64, npids, ntracks)
-
-    @inbounds for t = 1:ntracks
-        p = particles[t]
-        plen = context.radiator.depth / p.zDir
-        for h = 1:npids
-            mass = get_particle_mass(Int(hypotheses[h]))
-            beta = particle_beta(p, mass)
-            dist = PhotonSpectrumDistribution(spectrum, beta)
-            betas[h, t] = beta
-            distributions[h, t] = dist
-
-            eff = pattern_efficiency(
-                p,
-                beta,
-                mapper,
-                spectrum,
-                dist,
-                context,
-                detector;
-                n_photons = n_gen,
-                random_points = pts,
-            )
-            if eff > 0.0
-                inv_norms[h, t] = 1.0 / eff
-                event_prob.yields[t, h] = T(spectrum_yield(dist, plen) * eff)
-            end
-        end
-    end
+    betas, distributions, inv_norms = _prepare_event_probability!(
+        event_prob, particles, pixels, hypotheses, spectrum, mapper,
+        background, context, detector, n_gen, random_points,
+    )
 
     if threaded && nhits * ntracks > 4 && Threads.nthreads() > 1
         Threads.@threads for i = 1:nhits
             pix = @inbounds pixels[i]
             for t = 1:ntracks
                 _accumulate_pixel_signal_probs!(
-                    event_prob.sig_prob,
-                    i,
-                    t,
-                    pix,
-                    @inbounds(particles[t]),
-                    @view(betas[:, t]),
-                    @view(distributions[:, t]),
-                    @view(inv_norms[:, t]),
-                    cfg,
-                    mapper,
-                    spectrum,
-                    signal,
-                    context,
-                    detector,
-                    wedge,
+                    event_prob.sig_prob, i, t, pix, @inbounds(particles[t]),
+                    @view(betas[:, t]), @view(distributions[:, t]), @view(inv_norms[:, t]),
+                    cfg, mapper, spectrum, signal, context, detector, wedge,
                 )
             end
         end
@@ -415,27 +357,33 @@ function compute_event_probability!(
             n_view = @view inv_norms[:, t]
             for i = 1:nhits
                 _accumulate_pixel_signal_probs!(
-                    event_prob.sig_prob,
-                    i,
-                    t,
-                    pixels[i],
-                    p,
-                    b_view,
-                    d_view,
-                    n_view,
-                    cfg,
-                    mapper,
-                    spectrum,
-                    signal,
-                    context,
-                    detector,
-                    wedge,
+                    event_prob.sig_prob, i, t, pixels[i], p,
+                    b_view, d_view, n_view,
+                    cfg, mapper, spectrum, signal, context, detector, wedge,
                 )
             end
         end
     end
 
     return event_prob
+end
+
+@inline function _evaluate_coordinate_sweep!(
+    log_probs::AbstractMatrix{T},
+    event_prob::EventProbability{T},
+    best_id::Vector{Int},
+) where {T<:AbstractFloat}
+    ntracks = event_prob.ntracks
+    npids = event_prob.npids
+    @inbounds for t = 1:ntracks
+        last_id = best_id[t]
+        for h = 1:npids
+            best_id[t] = h
+            log_probs[t, h] = log_sum(event_prob, best_id)
+        end
+        best_id[t] = last_id
+    end
+    return nothing
 end
 
 """
@@ -474,14 +422,7 @@ function solve_unbinned_likelihoods!(
             idx = findfirst(==(true_pid), hypotheses)
             best_id[t] = idx === nothing ? 1 : idx
         end
-        @inbounds for t = 1:ntracks
-            last_id = best_id[t]
-            for h = 1:npids
-                best_id[t] = h
-                log_probs[t, h] = log_sum(event_prob, best_id)
-            end
-            best_id[t] = last_id
-        end
+        _evaluate_coordinate_sweep!(log_probs, event_prob, best_id)
     else
         @inbounds for iter = 1:n_iter
             if iter > 1
@@ -497,14 +438,7 @@ function solve_unbinned_likelihoods!(
                     best_id[t] = best_h
                 end
             end
-            for t = 1:ntracks
-                last_id = best_id[t]
-                for h = 1:npids
-                    best_id[t] = h
-                    log_probs[t, h] = log_sum(event_prob, best_id)
-                end
-                best_id[t] = last_id
-            end
+            _evaluate_coordinate_sweep!(log_probs, event_prob, best_id)
         end
     end
 
@@ -517,19 +451,12 @@ end
         particles::AbstractVector{Particle},
         hits::Union{AbstractVector{HitCoordinate},AbstractVector{PixelHit}};
         hypotheses = [211, 321, 2212],
-        spectrum::PhotonSpectrum = PhotonSpectrum(),
-        mapper::PhotonMapper = PhotonMapper(),
-        background::AbstractBackgroundModel = FlatBackground(DETECTOR),
-        cfg::ReverseMappingConfig = ReverseMappingConfig(),
-        signal::SignalParameters = SIGNAL,
-        context::PhotonContext = PhotonContext(RADIATOR, CONSTANTS),
-        detector::Detector = DETECTOR,
-        wedge::Wedge = WEDGE,
-        n_gen::Int = 1000,
-        n_iter::Int = 3,
-        cheated::Bool = false,
-        random_points::Union{AbstractVector{RandomPoint},Nothing} = nothing,
-        threaded::Bool = true,
+        spectrum = PhotonSpectrum(),
+        mapper = PhotonMapper(),
+        background = FlatBackground(DETECTOR),
+        n_iter = 3,
+        cheated = false,
+        kwargs...,
     )
 
 Full unbinned PID reconstruction pipeline for a TORCH module. Populates `log_probs[t, h]`
@@ -543,46 +470,16 @@ function run_unbinned_pid!(
     spectrum::PhotonSpectrum = PhotonSpectrum(),
     mapper::PhotonMapper = PhotonMapper(),
     background::AbstractBackgroundModel = FlatBackground(DETECTOR),
-    cfg::ReverseMappingConfig = ReverseMappingConfig(),
-    signal::SignalParameters = SIGNAL,
-    context::PhotonContext = PhotonContext(RADIATOR, CONSTANTS),
-    detector::Detector = DETECTOR,
-    wedge::Wedge = WEDGE,
-    n_gen::Int = 1000,
     n_iter::Int = 3,
     cheated::Bool = false,
-    random_points::Union{AbstractVector{RandomPoint},Nothing} = nothing,
-    threaded::Bool = true,
+    kwargs...,
 ) where {T<:AbstractFloat}
-    ntracks = length(particles)
-    nhits = length(hits)
-    npids = length(hypotheses)
-
-    event_prob = EventProbability(ntracks, nhits, npids, T)
+    event_prob = EventProbability(length(particles), length(hits), length(hypotheses), T)
     compute_event_probability!(
-        event_prob,
-        particles,
-        hits,
-        hypotheses,
-        spectrum,
-        mapper,
-        background;
-        cfg = cfg,
-        signal = signal,
-        context = context,
-        detector = detector,
-        wedge = wedge,
-        n_gen = n_gen,
-        random_points = random_points,
-        threaded = threaded,
+        event_prob, particles, hits, hypotheses, spectrum, mapper, background; kwargs...,
     )
     solve_unbinned_likelihoods!(
-        log_probs,
-        event_prob,
-        particles,
-        hypotheses;
-        n_iter = n_iter,
-        cheated = cheated,
+        log_probs, event_prob, particles, hypotheses; n_iter = n_iter, cheated = cheated,
     )
     return log_probs
 end
@@ -604,7 +501,7 @@ end
         particles::AbstractVector{Particle},
         hits::AbstractVector{HitCoordinate};
         hypotheses = [211, 321, 2212],
-        ...
+        kwargs...,
     )
 
 Single-track (local) unbinned PID algorithm where each track's log-likelihood is evaluated
@@ -618,14 +515,7 @@ function run_unbinned_local_pid!(
     spectrum::PhotonSpectrum = PhotonSpectrum(),
     mapper::PhotonMapper = PhotonMapper(),
     background::AbstractBackgroundModel = FlatBackground(DETECTOR),
-    cfg::ReverseMappingConfig = ReverseMappingConfig(),
-    signal::SignalParameters = SIGNAL,
-    context::PhotonContext = PhotonContext(RADIATOR, CONSTANTS),
-    detector::Detector = DETECTOR,
-    wedge::Wedge = WEDGE,
-    n_gen::Int = 1000,
-    random_points::Union{AbstractVector{RandomPoint},Nothing} = nothing,
-    threaded::Bool = true,
+    kwargs...,
 ) where {T<:AbstractFloat}
     ntracks = length(particles)
     nhits = length(hits)
@@ -633,21 +523,7 @@ function run_unbinned_local_pid!(
 
     event_prob = EventProbability(ntracks, nhits, npids, T)
     compute_event_probability!(
-        event_prob,
-        particles,
-        hits,
-        hypotheses,
-        spectrum,
-        mapper,
-        background;
-        cfg = cfg,
-        signal = signal,
-        context = context,
-        detector = detector,
-        wedge = wedge,
-        n_gen = n_gen,
-        random_points = random_points,
-        threaded = threaded,
+        event_prob, particles, hits, hypotheses, spectrum, mapper, background; kwargs...,
     )
 
     if nhits == 0
