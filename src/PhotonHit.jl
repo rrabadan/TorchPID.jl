@@ -40,6 +40,12 @@ mutable struct PhotonHit
         isDownward,
         isSurfaceScattered,
         isRayleighScattered,
+        cherenkovTheta = nothing,
+        cherenkovPhi = nothing,
+        pathlengthInRadiator = nothing,
+        GlobalX = nothing,
+        GlobalY = nothing,
+        GlobalZ = nothing,
     )
         return new(
             localX,
@@ -57,12 +63,12 @@ mutable struct PhotonHit
             isDownward,
             isSurfaceScattered,
             isRayleighScattered,
-            nothing,
-            nothing,
-            nothing,
-            nothing,
-            nothing,
-            nothing,
+            cherenkovTheta,
+            cherenkovPhi,
+            pathlengthInRadiator,
+            GlobalX,
+            GlobalY,
+            GlobalZ,
         )
     end
 end
