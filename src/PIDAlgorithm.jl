@@ -124,10 +124,32 @@ function run_algorithm(
     pidalg::PIDAlg,
     dht::DetectorHitTester,
     particles::Vector{Particle},
-    photons::Vector{PhotonHit},
-)
-    # Find particles and photons in the modules
-    #module_particles = find_particles(pidalg, particles)
+    photons::Vector{PhotonHit};
+    spectrum::PhotonSpectrum = PhotonSpectrum(dht),
+    mapper::PhotonMapper = PhotonMapper(blackened_bottom = pidalg.blackenedBottom),
+    background::AbstractBackgroundModel = FlatBackground(DETECTOR),
+    cfg::ReverseMappingConfig = ReverseMappingConfig(is_blackened_bottom = pidalg.blackenedBottom),
+    kwargs...,
+)::Dict{Int,Tuple{Vector{Particle},Matrix{Float64}}}
+    module_particles = find_particles(pidalg, particles)
     module_hits = find_coordinates(pidalg, dht, photons)
 
+    results = Dict{Int,Tuple{Vector{Particle},Matrix{Float64}}}()
+    for (mod_id, mod_tracks) in module_particles
+        if haskey(module_hits, mod_id)
+            mod_coords = module_hits[mod_id]
+            log_probs = run_unbinned_pid(
+                mod_tracks,
+                mod_coords;
+                hypotheses = pidalg.pids,
+                spectrum = spectrum,
+                mapper = mapper,
+                background = background,
+                cfg = cfg,
+                kwargs...,
+            )
+            results[mod_id] = (mod_tracks, log_probs)
+        end
+    end
+    return results
 end

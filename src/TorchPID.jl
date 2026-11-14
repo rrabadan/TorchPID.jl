@@ -16,7 +16,12 @@ export DetectorHitTester, photon_efficiency, test_photon
 export PhotonSpectrum, PhotonSpectrumDistribution
 export spectrum_nphase, spectrum_ngroup
 export spectrum_yield,
-    spectrum_random_energy, spectrum_probability, spectrum_random_sampling
+    spectrum_random_energy,
+    spectrum_probability,
+    spectrum_probability_nocheck,
+    propagation_properties,
+    propagation_properties_nocheck,
+    spectrum_random_sampling
 export Particle, particle_beta, particle_gamma, initial_rotation!, rotate, get_particle_mass
 export PARTICLE_PROPERTIES
 export Photon,
@@ -31,10 +36,28 @@ export ChargeDepositTester,
     charge_over_threshold, get_charge, get_smeared_time, smear_time, cached_time_weights
 export TorchImage, TorchImageAccumulator, fill!, reset!
 export project_pattern, make_pattern
+export get_xpixel_position,
+    get_ypixel_position, get_tpixel_position, get_hit_coordinate, is_in_pixel
 export FrontEnd, create_mcp_images, add_photon!, reset!, get_hits
 export TestBeamSimulator,
     TestBeamParticle, TestBeamPhotons, generate_particles, generate_photons_batch
-export FlatBackground, get_bkg_probability
+export AbstractBackgroundModel, FlatBackground, get_bkg_probability, fill_bkg_probabilities!
+export ReverseMappingConfig,
+    MappedPhoton,
+    focus_slope,
+    focus_ypath,
+    photon_jacobian,
+    hit_signal_probability,
+    accumulate_hit_signal_probs!,
+    map_hit
+export EventProbability,
+    log_sum,
+    pattern_efficiency,
+    compute_event_probability!,
+    solve_unbinned_likelihoods!,
+    run_unbinned_pid!,
+    run_unbinned_pid,
+    run_unbinned_local_pid!
 export run_local_pid
 export PhotonHit,
     update_photon_hit!,
@@ -62,6 +85,8 @@ include("PixelMapper.jl")
 include("FrontEnd.jl")
 include("TestBeam.jl")
 include("Background.jl")
+include("ReverseMapping.jl")
+include("UnbinnedPID.jl")
 include("LocalPID.jl")
 include("PhotonHit.jl")
 include("EventReader.jl")

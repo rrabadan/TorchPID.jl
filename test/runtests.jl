@@ -258,4 +258,115 @@ using TorchPID
         @test (@allocated reset!(mcps, fe)) == 0
     end
 
+    @testset "13. Phase P3: Reverse Mapping & Unbinned PID" begin
+        @test isbitstype(ReverseMappingConfig)
+        @test isbitstype(MappedPhoton)
+
+        s = PhotonSpectrum()
+        d = PhotonSpectrumDistribution(s, 0.999)
+        valid, en, vg, pr = @inferred propagation_properties(s, d, 1.48)
+        @test valid
+        @test s.emin <= en <= s.emax
+        @test vg > 0.0
+        @test pr > 0.0
+        @test (@allocated propagation_properties_nocheck(s, d, 1.48)) == 0
+
+        # Forward-to-reverse mapping roundtrip & zero-allocation kernel checks
+        Random.seed!(123)
+        p_pion = Particle(211, 0.0, 0.0, 5.0, 0.0, 0.05, sqrt(1.0 - 0.05^2), 0.0, 0.25, 5.0 * sqrt(1.0 - 0.05^2), 10000.0, 0.0)
+        beta_pi = particle_beta(p_pion, get_particle_mass(211))
+        dist_pi = PhotonSpectrumDistribution(s, beta_pi)
+        mapper = PhotonMapper()
+        ctx = PhotonContext(RADIATOR, CONSTANTS)
+        cfg = ReverseMappingConfig()
+
+        # Find a forward-traced photon from bar center that reaches the detector
+        test_hit = nothing
+        test_sinphi = 0.0
+        test_cosphi = 1.0
+        test_en = 3.5
+        for phi in range(-π, π, length = 72)
+            sp, cp = sincos(phi)
+            h = TorchPID._trace_center_photon(p_pion, beta_pi, test_en, sp, cp, mapper, s, ctx)
+            if h !== nothing && is_in_pixel(h, DETECTOR, RADIATOR)
+                test_hit = h
+                test_sinphi = sp
+                test_cosphi = cp
+                break
+            end
+        end
+        @test test_hit !== nothing
+
+        mapped = map_hit(p_pion, beta_pi, dist_pi, test_hit, cfg, mapper, s, ctx, WEDGE)
+        @test !isempty(mapped)
+
+        jac = @inferred photon_jacobian(p_pion, beta_pi, test_hit, test_en, test_sinphi, test_cosphi, mapper, s, ctx)
+        @test jac > 0.0
+        @test (@allocated photon_jacobian(p_pion, beta_pi, test_hit, test_en, test_sinphi, test_cosphi, mapper, s, ctx)) == 0
+
+        sig_p = @inferred hit_signal_probability(p_pion, beta_pi, dist_pi, test_hit, cfg, mapper, s, SIGNAL, ctx, WEDGE)
+        @test sig_p > 0.0
+        @test (@allocated hit_signal_probability(p_pion, beta_pi, dist_pi, test_hit, cfg, mapper, s, SIGNAL, ctx, WEDGE)) == 0
+
+        # EventProbability & log_sum zero-allocation check
+        ep = EventProbability(2, 10, 3)
+        fill!(ep.bkg_prob, 1e-6)
+        fill!(ep.yields, 15.0)
+        fill!(ep.sig_prob, 1e-4)
+        ids = [1, 2]
+        ll = @inferred log_sum(ep, ids)
+        @test isfinite(ll)
+        @test (@allocated log_sum(ep, ids)) == 0
+
+        # End-to-end Unbinned PID discrimination on simulated proton track at 5 GeV/c
+        p_prot = Particle(2212, 0.0, 0.0, 5.0, 0.0, 0.05, sqrt(1.0 - 0.05^2), 0.0, 0.25, 5.0 * sqrt(1.0 - 0.05^2), 10000.0, 0.0)
+        beta_pr = particle_beta(p_prot, get_particle_mass(2212))
+        hits_pr = project_pattern(p_prot, beta_pr, mapper, s, ctx)
+        @test !isempty(hits_pr)
+
+        hypos = [211, 321, 2212]
+        pts = [TorchPID.random_point(RADIATOR.depth) for _ = 1:500]
+        ll_single = zeros(Float64, 1, 3)
+        ll_thread = zeros(Float64, 1, 3)
+        ll_local = zeros(Float64, 1, 3)
+
+        run_unbinned_pid!(ll_single, [p_prot], hits_pr; hypotheses = hypos, spectrum = s, mapper = mapper, random_points = pts, threaded = false)
+        run_unbinned_pid!(ll_thread, [p_prot], hits_pr; hypotheses = hypos, spectrum = s, mapper = mapper, random_points = pts, threaded = true)
+        run_unbinned_local_pid!(ll_local, [p_prot], hits_pr; hypotheses = hypos, spectrum = s, mapper = mapper, random_points = pts, threaded = false)
+
+        @test ll_single ≈ ll_thread
+        @test argmax(vec(ll_single)) == 3  # Proton hypothesis (2212) wins over Pion/Kaon
+        @test argmax(vec(ll_local)) == 3
+
+        # Zero-allocation check on accumulate_hit_signal_probs!
+        sig_arr = zeros(Float64, 1, 1, 3)
+        betas_vec = [particle_beta(p_prot, get_particle_mass(h)) for h in hypos]
+        dists_vec = [PhotonSpectrumDistribution(s, b) for b in betas_vec]
+        inv_norms_vec = [2.0, 2.0, 2.0]
+        sl0 = focus_slope(cfg, test_hit.y)
+        yp0 = focus_ypath(cfg, test_hit.y, RADIATOR, WEDGE)
+        accumulate_hit_signal_probs!(sig_arr, 1, 1, test_hit, sl0, yp0, p_pion, betas_vec, dists_vec, inv_norms_vec, cfg, mapper, s, SIGNAL, ctx)
+        @test (@allocated accumulate_hit_signal_probs!(sig_arr, 1, 1, test_hit, sl0, yp0, p_pion, betas_vec, dists_vec, inv_norms_vec, cfg, mapper, s, SIGNAL, ctx)) == 0
+
+        # Multi-track (Pion + Proton) & PixelHit unbinned PID check
+        p_pi2 = Particle(211, 200.0, -50.0, 5.0, 0.0, -0.04, sqrt(1.0 - 0.04^2), 0.0, -0.20, 5.0 * sqrt(1.0 - 0.04^2), 10000.0, 0.0)
+        hits_pi2 = project_pattern(p_pi2, particle_beta(p_pi2, get_particle_mass(211)), mapper, s, ctx)
+        combined_hits = vcat(hits_pi2, hits_pr)
+        ll_multi = run_unbinned_pid([p_pi2, p_prot], combined_hits; hypotheses = hypos, spectrum = s, mapper = mapper, random_points = pts)
+        @test argmax(ll_multi[1, :]) == 1  # Track 1 identified as Pion (211)
+        @test argmax(ll_multi[2, :]) == 3  # Track 2 identified as Proton (2212)
+
+        # PixelHit 9-point quadrature unbinned PID check
+        fe = FrontEnd(DETECTOR)
+        cdt = ChargeDepositTester()
+        mcps = create_mcp_images(fe)
+        for h in hits_pr
+            add_photon!(mcps, fe, cdt, h)
+        end
+        pix_hits = get_hits(mcps, fe)
+        @test pix_hits !== nothing && !isempty(pix_hits)
+        ll_pix = run_unbinned_pid([p_prot], pix_hits; hypotheses = hypos, spectrum = s, mapper = mapper, random_points = pts)
+        @test argmax(vec(ll_pix)) == 3
+    end
+
 end

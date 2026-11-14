@@ -154,3 +154,65 @@ function get_tpixel(t::Float64)::Int
     end
     return pixelnum
 end
+
+@inline function get_xpixel_position(
+    pixel_num::Int,
+    detector::Detector = DETECTOR,
+    radiator::Radiator = RADIATOR,
+)::Float64
+    d_num = div(pixel_num, detector.n_xpixels)
+    p_det = rem(pixel_num, detector.n_xpixels)
+    return -0.5 * radiator.width +
+           detector.width * d_num +
+           detector.gap +
+           detector.x_size * (p_det + 0.5)
+end
+
+@inline function get_ypixel_position(
+    pixel_num::Int,
+    detector::Detector = DETECTOR,
+)::Float64
+    return detector.y_min + (pixel_num + 0.5) * detector.y_size
+end
+
+@inline function get_tpixel_position(
+    pixel_num::Int,
+    detector::Detector = DETECTOR,
+)::Float64
+    return detector.t_min + (pixel_num + 0.5) * detector.t_bin
+end
+
+@inline function get_hit_coordinate(
+    hit::PixelHit,
+    detector::Detector = DETECTOR,
+    radiator::Radiator = RADIATOR,
+)::HitCoordinate
+    return HitCoordinate(
+        get_xpixel_position(hit.x, detector, radiator),
+        get_ypixel_position(hit.y, detector),
+        get_tpixel_position(hit.t, detector),
+    )
+end
+
+@inline function is_in_pixel(
+    hit::HitCoordinate,
+    detector::Detector = DETECTOR,
+    radiator::Radiator = RADIATOR,
+)::Bool
+    xpos = hit.x + 0.5 * radiator.width
+    ndetector = floor(Int, xpos / detector.width)
+    if ndetector < 0 || ndetector >= detector.n_detectors
+        return false
+    end
+    xdetector = xpos - ndetector * detector.width
+    xpix = floor(Int, (xdetector - detector.gap) / detector.x_size)
+    if xpix < 0 || xpix >= detector.n_xpixels
+        return false
+    end
+    ypix = floor(Int, (hit.y - detector.y_min) / detector.y_size)
+    if ypix < 0 || ypix >= detector.n_ypixels
+        return false
+    end
+    tpix = floor(Int, (hit.t - detector.t_min) / detector.t_bin)
+    return 0 <= tpix < detector.n_tpixels
+end

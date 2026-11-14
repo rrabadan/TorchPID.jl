@@ -48,6 +48,9 @@ struct PhotonSpectrum
     emin::Float64
     emax::Float64
     dE::Float64
+    nphase_min::Float64
+    nphase_max::Float64
+    dnphase::Float64
 
     energy::Vector{Float64}
     efficiency::Vector{Float64}
@@ -55,6 +58,7 @@ struct PhotonSpectrum
     ngroup::Vector{Float64}
     vgroup::Vector{Float64}
     nphase_edge::Vector{Float64}
+    nphase_energy_bin::Vector{Int32}
 end
 
 function PhotonSpectrum(
@@ -84,8 +88,36 @@ function PhotonSpectrum(
     end
 
     vgroup = CLIGHT ./ ngroup
+    nphase_min = nphase_Corning(emin)
+    nphase_max = nphase_Corning(emax)
+    dnphase = (nphase_edge[end] - nphase_edge[1]) / nbins
 
-    PhotonSpectrum(nbins, emin, emax, dE, energy, eff, nphase, ngroup, vgroup, nphase_edge)
+    nphase_energy_bin = Vector{Int32}(undef, nbins + 3)
+    for i = 1:nbins
+        np = nphase_edge[1] + ((i - 1) + 0.5) * dnphase
+        bin = clamp(searchsortedfirst(nphase_edge, np), 1, nbins)
+        nphase_energy_bin[i] = Int32(bin)
+    end
+    nphase_energy_bin[nbins + 1] = Int32(nbins)
+    nphase_energy_bin[nbins + 2] = Int32(nbins)
+    nphase_energy_bin[nbins + 3] = Int32(nbins)
+
+    PhotonSpectrum(
+        nbins,
+        emin,
+        emax,
+        dE,
+        nphase_min,
+        nphase_max,
+        dnphase,
+        energy,
+        eff,
+        nphase,
+        ngroup,
+        vgroup,
+        nphase_edge,
+        nphase_energy_bin,
+    )
 end
 
 function PhotonSpectrum(; nbins::Int = 525, emin::Float64 = 1.75, emax::Float64 = 7.00)
@@ -262,7 +294,7 @@ end
 - `Float64`: The probability density at the given energy, normalized by the yield per millimeter,
   or 0.0 if energy is outside the spectrum range.
 """
-function spectrum_probability(
+@inline function spectrum_probability(
     s::PhotonSpectrum,
     d::PhotonSpectrumDistribution,
     energy::Float64,
@@ -271,7 +303,41 @@ function spectrum_probability(
         return 0.0
     end
     n = floor(Int, (energy - s.emin) / s.dE) + 1
-    return (n ≥ 1 && n ≤ s.nbins) ? d.distribution[n] / (s.dE * d.yield_per_mm) : 0.0
+    return (n ≥ 1 && n ≤ s.nbins) ? (@inbounds d.distribution[n]) / (s.dE * d.yield_per_mm) : 0.0
+end
+
+@inline function spectrum_probability_nocheck(
+    s::PhotonSpectrum,
+    d::PhotonSpectrumDistribution,
+    energy::Float64,
+)::Float64
+    n = clamp(floor(Int, (energy - s.emin) / s.dE) + 1, 1, s.nbins)
+    return (@inbounds d.distribution[n]) / (s.dE * d.yield_per_mm)
+end
+
+@inline function propagation_properties_nocheck(
+    s::PhotonSpectrum,
+    d::PhotonSpectrumDistribution,
+    nphase::Float64,
+)::Tuple{Float64,Float64,Float64}
+    idx = clamp(floor(Int, (nphase - (@inbounds s.nphase_edge[1])) / s.dnphase) + 1, 1, s.nbins + 3)
+    bin = Int(@inbounds s.nphase_energy_bin[idx])
+    energy = s.emin + (bin - 0.5) * s.dE
+    vgroup = @inbounds s.vgroup[bin]
+    prob = (@inbounds d.distribution[bin]) / (s.dE * d.yield_per_mm)
+    return (energy, vgroup, prob)
+end
+
+@inline function propagation_properties(
+    s::PhotonSpectrum,
+    d::PhotonSpectrumDistribution,
+    nphase::Float64,
+)::Tuple{Bool,Float64,Float64,Float64}
+    if !(s.nphase_min < nphase < s.nphase_max) || !spectrum_above_threshold(d)
+        return (false, 0.0, 0.0, 0.0)
+    end
+    energy, vgroup, prob = propagation_properties_nocheck(s, d, nphase)
+    return (true, energy, vgroup, prob)
 end
 
 """

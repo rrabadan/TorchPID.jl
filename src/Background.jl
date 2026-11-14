@@ -1,10 +1,12 @@
-struct FlatBackground
+abstract type AbstractBackgroundModel end
+
+struct FlatBackground <: AbstractBackgroundModel
     detector::Detector
     prob_pixel::Float64
     prob_hit::Float64
 end
 
-function FlatBackground(detector::Detector)
+function FlatBackground(detector::Detector = DETECTOR)
     v = (
         detector.n_detectors *
         (detector.active * detector.active) *
@@ -17,10 +19,21 @@ function FlatBackground(detector::Detector)
     return FlatBackground(detector, prob_pixel, prob_hit)
 end
 
-function get_bkg_probability(background::FlatBackground, pixel::PixelHit)
+@inline function get_bkg_probability(background::FlatBackground, pixel::PixelHit)::Float64
     return background.prob_pixel
 end
 
-function get_bkg_probability(background::FlatBackground, hit::HitCoordinate)
+@inline function get_bkg_probability(background::FlatBackground, hit::HitCoordinate)::Float64
     return background.prob_hit
+end
+
+function fill_bkg_probabilities!(
+    bkg_prob::AbstractVector{T},
+    background::AbstractBackgroundModel,
+    hits::AbstractVector,
+) where {T<:AbstractFloat}
+    @inbounds for i in eachindex(hits, bkg_prob)
+        bkg_prob[i] = T(get_bkg_probability(background, hits[i]))
+    end
+    return bkg_prob
 end
