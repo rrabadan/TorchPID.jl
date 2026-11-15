@@ -164,7 +164,7 @@ end
     accumulate_hit_signal_probs!(
         sig_prob, hit_idx, track_idx, hit, slope, ypath,
         particle, betas, distributions, inv_norms,
-        cfg, mapper, spectrum, signal, context,
+        cfg, mapper, spectrum, signal, context, weight = 1.0,
     )
 
 Fused multi-hypothesis kernel: computes the β-independent photon path `(dx, dy, dz, pathlength, costhetac)`
@@ -186,6 +186,7 @@ once per reflection branch in registers and immediately evaluates all mass hypot
     spectrum::PhotonSpectrum,
     signal::SignalParameters,
     context::PhotonContext,
+    weight::Float64 = 1.0,
 ) where {T<:AbstractFloat}
     radiator = context.radiator
     n_air = context.constants.N_AIR
@@ -236,7 +237,7 @@ once per reflection branch in registers and immediately evaluates all mass hypot
                         pathlength, prob_en, mapper, spectrum, signal, context,
                     )
                     if pdf_val > 0.0
-                        sig_prob[hit_idx, track_idx, h] += T(pdf_val * inv_norm)
+                        sig_prob[hit_idx, track_idx, h] += T(weight * pdf_val * inv_norm)
                     end
                 end
             end
@@ -272,28 +273,29 @@ const PIXEL_QUAD_WEIGHTS = (0.25, 0.25, 0.25, 0.25, 0.5, 0.5, 0.5, 0.5, 1.0)
     ymin = center.y - dy
     ymax = center.y + dy
 
+    radiator = context.radiator
+    sl_min = focus_slope(cfg, ymin)
+    yp_min = focus_ypath(cfg, ymin, radiator, wedge)
+    sl_max = focus_slope(cfg, ymax)
+    yp_max = focus_ypath(cfg, ymax, radiator, wedge)
+    sl_ctr = focus_slope(cfg, center.y)
+    yp_ctr = focus_ypath(cfg, center.y, radiator, wedge)
+
     xs = (xmin, xmin, xmax, xmax, center.x, center.x, xmin, xmax, center.x)
     ys = (ymin, ymax, ymin, ymax, ymin, ymax, center.y, center.y, center.y)
+    sls = (sl_min, sl_max, sl_min, sl_max, sl_min, sl_max, sl_ctr, sl_ctr, sl_ctr)
+    yps = (yp_min, yp_max, yp_min, yp_max, yp_min, yp_max, yp_ctr, yp_ctr, yp_ctr)
 
     area_factor = 0.25 * detector.x_size * detector.y_size * detector.t_bin
 
     @inbounds for q = 1:9
         sub_hit = HitCoordinate(xs[q], ys[q], center.t)
-        slope = focus_slope(cfg, sub_hit.y)
-        ypath = focus_ypath(cfg, sub_hit.y, context.radiator, wedge)
         w = PIXEL_QUAD_WEIGHTS[q] * area_factor
-
-        for h in eachindex(betas)
-            inv_n = inv_norms[h]
-            if inv_n > 0.0
-                p = hit_signal_probability(
-                    particle, betas[h], distributions[h], sub_hit,
-                    cfg, mapper, spectrum, signal, context, wedge;
-                    slope = slope, ypath = ypath,
-                )
-                sig_prob[pixel_idx, track_idx, h] += T(w * p * inv_n)
-            end
-        end
+        accumulate_hit_signal_probs!(
+            sig_prob, pixel_idx, track_idx, sub_hit, sls[q], yps[q],
+            particle, betas, distributions, inv_norms,
+            cfg, mapper, spectrum, signal, context, w,
+        )
     end
     return nothing
 end

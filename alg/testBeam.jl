@@ -1,36 +1,47 @@
-using ArgParse
-using BenchmarkTools
 using Plots
 using Random
 
 using TorchPID
 
 
-function parse_commandline()
-    s = ArgParseSettings()
-    s.description = "Test Beam Simulation"
-    @add_arg_table s begin
-        "events"
-        help = "number of events to simulate"
-        required = true
-        arg_type = Int
+function parse_commandline(raw_args::Vector{String} = ARGS)
+    opts = Dict{String,Any}(
+        "events" => nothing,
+        "threads" => Threads.nthreads(),
+        "plot-interval" => 1000,
+        "no-plot" => false,
+    )
+    i = 1
+    while i <= length(raw_args)
+        arg = raw_args[i]
+        if arg == "--threads" && i < length(raw_args)
+            opts["threads"] = parse(Int, raw_args[i + 1])
+            i += 2
+        elseif arg == "--plot-interval" && i < length(raw_args)
+            opts["plot-interval"] = parse(Int, raw_args[i + 1])
+            i += 2
+        elseif arg == "--no-plot"
+            opts["no-plot"] = true
+            i += 1
+        elseif !startswith(arg, "-") && opts["events"] === nothing
+            opts["events"] = parse(Int, arg)
+            i += 1
+        else
+            error(
+                "Usage: julia --project=. --threads=auto alg/testBeam.jl <events> [--threads N] [--plot-interval N] [--no-plot]",
+            )
+        end
     end
-    @add_arg_table s begin
-        "--threads"
-        help = "number of threads to use (default: auto)"
-        arg_type = Int
-        default = Sys.CPU_THREADS
+    if opts["events"] === nothing
+        error(
+            "Missing required positional argument <events>.\nUsage: julia --project=. --threads=auto alg/testBeam.jl <events> [--threads N] [--plot-interval N] [--no-plot]",
+        )
     end
-    @add_arg_table s begin
-        "--plot-interval"
-        help = "Update plots every N events"
-        arg_type = Int
-        default = 100
-    end
-    return parse_args(s)
+    return opts
 end
 
 function update_histograms(pMag_data, pixels_x, pixels_y)
+    isempty(pMag_data) && return nothing
     try
         # Create histograms
         p1 = histogram(
@@ -77,6 +88,7 @@ function main()
     events = args["events"]
     nthreads = args["threads"]
     plot_interval = args["plot-interval"]
+    no_plot = args["no-plot"]
     batch_size = 1000  # Choose a reasonable batch size
 
     tb_simulator = TestBeamSimulator()
@@ -90,8 +102,6 @@ function main()
     pMag = Float64[]
     pixels_x = Float64[]
     pixels_y = Float64[]
-
-    update_histograms(pMag, pixels_x, pixels_y)
 
     for batch_start in 1:batch_size:events
         this_batch = min(batch_size, events - batch_start + 1)
@@ -124,14 +134,21 @@ function main()
         end
 
         progress += this_batch
-        if progress % plot_interval == 0
+        if !no_plot && (progress % plot_interval == 0)
             update_histograms(pMag, pixels_x, pixels_y)
         end
     end
 
-    update_histograms(pMag, pixels_x, pixels_y)
-    println("\nSimulation complete. Press Enter to exit.")
-    readline()
+    if !no_plot
+        update_histograms(pMag, pixels_x, pixels_y)
+    end
+    println(
+        "\nSimulation complete: $(length(pMag)) particles, $(length(pixels_x)) digitized pixel hits.",
+    )
+    if !no_plot && stdin isa Base.TTY
+        println("Press Enter to exit.")
+        readline()
+    end
 end
 
 main()

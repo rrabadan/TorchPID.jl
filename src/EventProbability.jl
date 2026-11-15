@@ -72,7 +72,7 @@ end
 @inline function _evaluate_coordinate_sweep!(
     log_probs::AbstractMatrix{T},
     event_prob::EventProbability{T},
-    best_id::Vector{Int},
+    best_id::AbstractVector{Int},
 ) where {T<:AbstractFloat}
     ntracks = event_prob.ntracks
     npids = event_prob.npids
@@ -95,6 +95,7 @@ end
         hypotheses::AbstractVector{<:Integer};
         n_iter::Int = 3,
         cheated::Bool = false,
+        best_id_buf::Union{Vector{Int},Nothing} = nothing,
     )
 
 Runs coordinate-ascent (or cheated MC truth) multi-track log-likelihood evaluation on
@@ -107,6 +108,7 @@ function solve_unbinned_likelihoods!(
     hypotheses::AbstractVector{<:Integer};
     n_iter::Int = 3,
     cheated::Bool = false,
+    best_id_buf::Union{Vector{Int},Nothing} = nothing,
 ) where {T<:AbstractFloat}
     ntracks = event_prob.ntracks
     npids = event_prob.npids
@@ -115,7 +117,15 @@ function solve_unbinned_likelihoods!(
         return log_probs
     end
 
-    best_id = ones(Int, ntracks)
+    if best_id_buf === nothing
+        best_id = ones(Int, ntracks)
+    else
+        length(best_id_buf) < ntracks && resize!(best_id_buf, ntracks)
+        best_id = best_id_buf
+        @inbounds for t = 1:ntracks
+            best_id[t] = 1
+        end
+    end
 
     if cheated
         @inbounds for t = 1:ntracks

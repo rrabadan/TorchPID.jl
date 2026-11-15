@@ -380,6 +380,47 @@ using TorchPID
         @test pix_hits !== nothing && !isempty(pix_hits)
         ll_pix = run_unbinned_pid([p_prot], pix_hits; hypotheses = hypos, spectrum = s, mapper = mapper, random_points = pts)
         @test argmax(vec(ll_pix)) == 3
+
+        # UnbinnedPIDWorkspace zero-allocation & run_unbinned_pid_batch! check
+        ws_pid = UnbinnedPIDWorkspace(s, Float64; max_tracks = 4, max_hits = max(length(combined_hits), length(pix_hits)) + 10, max_pids = 3, n_gen = 500)
+        ps_two = [p_pi2, p_prot]
+        ps_one = [p_prot]
+        ll_ws = zeros(Float64, 2, 3)
+        run_unbinned_pid!(ll_ws, ps_two, combined_hits; hypotheses = hypos, spectrum = s, mapper = mapper, random_points = pts, threaded = false, workspace = ws_pid)
+        @test ll_ws ≈ ll_multi
+        @test (@allocated run_unbinned_pid!(ll_ws, ps_two, combined_hits; hypotheses = hypos, spectrum = s, mapper = mapper, random_points = pts, threaded = false, workspace = ws_pid)) == 0
+
+        ll_pix_ws = zeros(Float64, 1, 3)
+        run_unbinned_pid!(ll_pix_ws, ps_one, pix_hits; hypotheses = hypos, spectrum = s, mapper = mapper, random_points = pts, threaded = false, workspace = ws_pid)
+        @test ll_pix_ws ≈ ll_pix
+        @test (@allocated run_unbinned_pid!(ll_pix_ws, ps_one, pix_hits; hypotheses = hypos, spectrum = s, mapper = mapper, random_points = pts, threaded = false, workspace = ws_pid)) == 0
+
+        batch_parts = [ps_two, [p_prot, p_pi2], ps_two, [p_prot, p_pi2]]
+        batch_hits = [combined_hits, combined_hits, combined_hits, combined_hits]
+        batch_1t = run_unbinned_pid_batch(batch_parts, batch_hits; hypotheses = hypos, spectrum = s, mapper = mapper, random_points = pts, nthreads = 1)
+        batch_mt = run_unbinned_pid_batch(batch_parts, batch_hits; hypotheses = hypos, spectrum = s, mapper = mapper, random_points = pts, nthreads = 4)
+        @test all(batch_1t[i] ≈ batch_mt[i] for i in 1:4)
+        @test batch_1t[1] ≈ ll_multi
+
+        # 18-module CPU dispatcher (ModulePIDWorkspace + run_module_pid!)
+        ws_mod = ModulePIDWorkspace(s, Float64; max_tracks = 4, max_hits = length(combined_hits) + 10, n_gen = 500)
+        set_module!(ws_mod, 0, ps_one, hits_pr)          # 0-based module id supported
+        set_module!(ws_mod, 7, ps_two, combined_hits)
+        set_module!(ws_mod, 12, ps_one, HitCoordinate[]) # no hits -> inactive
+        active = update_active_modules!(ws_mod)
+        @test length(active) == 2
+        @test active[1] == 8                              # heaviest module (id 7) scheduled first
+        run_module_pid!(ws_mod, hypos; spectrum = s, mapper = mapper, random_points = pts, nthreads = 1)
+        lp7_seq = copy(module_log_probs(ws_mod, 7))
+        lp0_seq = copy(module_log_probs(ws_mod, 0))
+        @test lp7_seq ≈ ll_multi
+        @test argmax(vec(lp0_seq)) == 3
+        @test (@allocated run_module_pid!(ws_mod, hypos; spectrum = s, mapper = mapper, random_points = pts, nthreads = 1)) == 0
+        run_module_pid!(ws_mod, hypos; spectrum = s, mapper = mapper, random_points = pts, nthreads = 4)
+        @test module_log_probs(ws_mod, 7) ≈ lp7_seq
+        @test module_log_probs(ws_mod, 0) ≈ lp0_seq
+        clear_modules!(ws_mod)
+        @test isempty(ws_mod.active_slots)
     end
 
 end

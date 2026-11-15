@@ -210,6 +210,14 @@ function PhotonSpectrumDistribution(s::PhotonSpectrum, beta::Float64)
     return update_distribution!(distribution, cumulative, s, beta)
 end
 
+@inline function update_distribution!(
+    d::PhotonSpectrumDistribution,
+    s::PhotonSpectrum,
+    beta::Float64,
+)::PhotonSpectrumDistribution
+    return update_distribution!(d.distribution, d.cumulative, s, beta)
+end
+
 """ 
     spectrum_nphase(s::PhotonSpectrum, energy::Float64)
 

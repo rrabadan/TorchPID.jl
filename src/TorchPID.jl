@@ -56,12 +56,15 @@ export ReverseMappingConfig,
     accumulate_hit_signal_probs!,
     map_hit
 export EventProbability,
+    UnbinnedPIDWorkspace,
     log_sum,
     pattern_efficiency,
     compute_event_probability!,
     solve_unbinned_likelihoods!,
     run_unbinned_pid!,
     run_unbinned_pid,
+    run_unbinned_pid_batch!,
+    run_unbinned_pid_batch,
     run_unbinned_local_pid!
 export run_local_pid
 export PhotonHit,
@@ -72,7 +75,16 @@ export PhotonHit,
     is_photon_masked
 export create_event_reader,
     get_event_data, event_iterator, get_particles_in_event, get_hits_in_event
-export PIDAlg, run_algorithm
+export PIDAlg,
+    ModulePIDWorkspace,
+    partition_by_module!,
+    clear_modules!,
+    set_module!,
+    update_active_modules!,
+    module_log_probs,
+    run_module_pid!,
+    run_algorithm!,
+    run_algorithm
 
 include("PhysicsConstants.jl")
 include("GeometryConstants.jl")
