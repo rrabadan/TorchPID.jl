@@ -217,35 +217,39 @@ struct TestBeamPhotons
 end
 
 """
-    generate_particle(tb::TestBeamSimulator)::TestBeamParticle
+    TestBeamWorkspace(spectrum::PhotonSpectrum, fe::FrontEnd)
 
-`generate_particle` simulates a particle based on the beam configuration. 
-The entry position is sampled from a normal distribution with means `entryX` and `entryY` and standard deviations `sigmaEntryX` and `sigmaEntryY`. 
-The momentum is sampled from a normal distribution with mean `momentumMean` and standard deviation `momentumSigma`. 
-Direction angles (`theta` and `phi`) are also sampled from normal distributions with means `thetaMean` and `phiMean` 
-and standard deviations `thetaSigma` and `phiSigma`. 
-The timing reference position and flight time are calculated using the `timingDistance` parameter, accounting for the particle's velocity and path length.
-
-# Arguments
-- `tb::TestBeamSimulator`: Test beam simulator configuration.
-
-# Returns
-- `TestBeamParticle`: A simulated test beam particle.
+Per-thread reusable workspace for zero-temporary-allocation TestBeam photon simulation and digitization.
 """
-function generate_particles(
-    tb::TestBeamSimulator,
-    radiator::Radiator,
-    constants::Constants,
-    N::Int,
-)::Vector{TestBeamParticle}
-    mass = get_particle_mass(tb.pid)
-    half_width = radiator.half_width
-    half_height = 0.5 * radiator.height
-    clight = constants.CLIGHT
-    has_timing_res = tb.timingResolution != 0.0
+struct TestBeamWorkspace
+    mcp_images::MCPImageArray
+    dist_buf::Vector{Float64}
+    cum_buf::Vector{Float64}
+    photons_buf::Vector{HitCoordinate}
+    pixels_buf::Vector{PixelHit}
+end
 
-    particles = Vector{TestBeamParticle}(undef, N)
-    @inbounds for i = 1:N
+function TestBeamWorkspace(spectrum::PhotonSpectrum, fe::FrontEnd)::TestBeamWorkspace
+    mcp_images = create_mcp_images(fe)
+    dist_buf = Vector{Float64}(undef, spectrum.nbins)
+    cum_buf = Vector{Float64}(undef, spectrum.nbins)
+    photons_buf = sizehint!(HitCoordinate[], 128)
+    pixels_buf = sizehint!(PixelHit[], 128)
+    return TestBeamWorkspace(mcp_images, dist_buf, cum_buf, photons_buf, pixels_buf)
+end
+
+@inline function _generate_particles_range!(
+    particles::Vector{TestBeamParticle},
+    lo::Int,
+    hi::Int,
+    tb::TestBeamSimulator,
+    mass::Float64,
+    half_width::Float64,
+    half_height::Float64,
+    clight::Float64,
+    has_timing_res::Bool,
+)
+    @inbounds for i = lo:hi
         ex = (tb.entryX + tb.sigmaEntryX * randn()) - half_width
         ey = (tb.entryY + tb.sigmaEntryY * randn()) - half_height
 
@@ -297,6 +301,48 @@ function generate_particles(
             ftime,
         )
     end
+    return nothing
+end
+
+"""
+    generate_particles(
+        tb::TestBeamSimulator,
+        radiator::Radiator,
+        constants::Constants,
+        N::Int;
+        nthreads::Int = Threads.nthreads(),
+    )::Vector{TestBeamParticle}
+
+Simulates `N` test beam particles based on the beam configuration, using `nthreads` threads when `nthreads > 1`.
+"""
+function generate_particles(
+    tb::TestBeamSimulator,
+    radiator::Radiator,
+    constants::Constants,
+    N::Int;
+    nthreads::Int = Threads.nthreads(),
+)::Vector{TestBeamParticle}
+    mass = get_particle_mass(tb.pid)
+    half_width = radiator.half_width
+    half_height = 0.5 * radiator.height
+    clight = constants.CLIGHT
+    has_timing_res = tb.timingResolution != 0.0
+
+    particles = Vector{TestBeamParticle}(undef, N)
+    nchunks = min(max(nthreads, 1), N)
+    if nchunks <= 1
+        _generate_particles_range!(
+            particles, 1, N, tb, mass, half_width, half_height, clight, has_timing_res
+        )
+    else
+        Threads.@threads for chunk = 1:nchunks
+            lo = div((chunk - 1) * N, nchunks) + 1
+            hi = div(chunk * N, nchunks)
+            _generate_particles_range!(
+                particles, lo, hi, tb, mass, half_width, half_height, clight, has_timing_res
+            )
+        end
+    end
     return particles
 end
 
@@ -308,26 +354,10 @@ end
         context::PhotonContext,
         fe::FrontEnd,
         cdt::ChargeDepositTester,
-        mcp_images::MCPImageArray = create_mcp_images(fe),
+        ws::TestBeamWorkspace,
     )::Union{Nothing,TestBeamPhotons}
 
-`generate_photons` simulates and processes photons resulting from a particle interaction. 
-It first calculates the photon yield based on the particle's beta and the provided spectrum. 
-The photon pattern is then projected using the mapper, and photon hits are added to MCP images. 
-Hits are extracted from the MCP images based on the front-end configuration. 
-If no valid pixel hits are detected, the function returns `nothing`.
-
-# Arguments
-- `particle::TestBeamParticle`: The particle generating the photons.
-- `spectrum::PhotonSpectrum`: Spectrum parameters for photon generation.
-- `mapper::PhotonMapper`: Mapper for photon projection.
-- `context::PhotonContext`: Photon tracing context.
-- `fe::FrontEnd`: Front-end electronics configuration.
-- `cdt::ChargeDepositTester`: Configuration for charge deposit testing.
-- `mcp_images::MCPImageArray`: Optional pre-allocated MCP image array to reuse across events.
-
-# Returns
-- `Union{Nothing,TestBeamPhotons}`: Photon detection results, or `nothing` if no valid hits were detected.
+Simulates and digitizes photons from a test beam particle using a pre-allocated `TestBeamWorkspace` (or `MCPImageArray`).
 """
 function generate_photons(
     particle::TestBeamParticle,
@@ -336,12 +366,11 @@ function generate_photons(
     context::PhotonContext,
     fe::FrontEnd,
     cdt::ChargeDepositTester,
-    mcp_images::MCPImageArray = create_mcp_images(fe),
+    ws::TestBeamWorkspace,
 )::Union{Nothing,TestBeamPhotons}
-
-    # Generate the number of photons
-    photon_distribution = PhotonSpectrumDistribution(spectrum, particle.beta)
-    photons = project_pattern(
+    photon_distribution = update_distribution!(ws.dist_buf, ws.cum_buf, spectrum, particle.beta)
+    photons = project_pattern!(
+        ws.photons_buf,
         particle.particle,
         particle.beta,
         mapper,
@@ -351,13 +380,13 @@ function generate_photons(
     )
     photon_yield = length(photons)
 
-    reset!(mcp_images, fe)
+    reset!(ws.mcp_images, fe)
     for photon in photons
-        add_photon!(mcp_images, fe, cdt, photon)
+        add_photon!(ws.mcp_images, fe, cdt, photon)
     end
 
-    pixels = get_hits(mcp_images, fe)
-    if isnothing(pixels)
+    pixels = get_hits!(ws.pixels_buf, ws.mcp_images, fe)
+    if isempty(pixels)
         return nothing
     end
 
@@ -380,7 +409,44 @@ function generate_photons(
         charge[i] = p.ch
     end
 
-    TestBeamPhotons(photon_yield, npixels, xpixels, ypixels, tpixels, mcp, mcpcolum, charge)
+    return TestBeamPhotons(photon_yield, npixels, xpixels, ypixels, tpixels, mcp, mcpcolum, charge)
+end
+
+function generate_photons(
+    particle::TestBeamParticle,
+    spectrum::PhotonSpectrum,
+    mapper::PhotonMapper,
+    context::PhotonContext,
+    fe::FrontEnd,
+    cdt::ChargeDepositTester,
+    mcp_images::MCPImageArray = create_mcp_images(fe),
+)::Union{Nothing,TestBeamPhotons}
+    ws = TestBeamWorkspace(
+        mcp_images,
+        Vector{Float64}(undef, spectrum.nbins),
+        Vector{Float64}(undef, spectrum.nbins),
+        sizehint!(HitCoordinate[], 128),
+        sizehint!(PixelHit[], 128),
+    )
+    return generate_photons(particle, spectrum, mapper, context, fe, cdt, ws)
+end
+
+function _generate_photons_range!(
+    results::Vector{Union{Nothing,TestBeamPhotons}},
+    particles::Vector{TestBeamParticle},
+    lo::Int,
+    hi::Int,
+    spectrum::PhotonSpectrum,
+    mapper::PhotonMapper,
+    context::PhotonContext,
+    fe::FrontEnd,
+    cdt::ChargeDepositTester,
+    ws::TestBeamWorkspace,
+)
+    @inbounds for i = lo:hi
+        results[i] = generate_photons(particles[i], spectrum, mapper, context, fe, cdt, ws)
+    end
+    return nothing
 end
 
 function generate_photons_batch(
@@ -389,13 +455,22 @@ function generate_photons_batch(
     mapper::PhotonMapper,
     context::PhotonContext,
     fe::FrontEnd,
-    cdt::ChargeDepositTester,
+    cdt::ChargeDepositTester;
+    nthreads::Int = Threads.nthreads(),
 )::Vector{Union{Nothing,TestBeamPhotons}}
     N = length(particles)
     results = Vector{Union{Nothing,TestBeamPhotons}}(undef, N)
-    mcp_images = create_mcp_images(fe)
-    for i = 1:N
-        results[i] = generate_photons(particles[i], spectrum, mapper, context, fe, cdt, mcp_images)
+    nchunks = min(max(nthreads, 1), N)
+    if nchunks <= 1
+        ws = TestBeamWorkspace(spectrum, fe)
+        _generate_photons_range!(results, particles, 1, N, spectrum, mapper, context, fe, cdt, ws)
+    else
+        Threads.@threads for chunk = 1:nchunks
+            ws = TestBeamWorkspace(spectrum, fe)
+            lo = div((chunk - 1) * N, nchunks) + 1
+            hi = div(chunk * N, nchunks)
+            _generate_photons_range!(results, particles, lo, hi, spectrum, mapper, context, fe, cdt, ws)
+        end
     end
     return results
 end

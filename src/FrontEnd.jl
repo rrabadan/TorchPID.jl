@@ -22,13 +22,15 @@ Initializes an empty pixel map with the specified dimensions.
 """
 struct MCPPixelMap
     data::Matrix{Vector{Tuple{Int,Float64}}}
+    occupied::Vector{Tuple{Int,Int}}
     n_xpixels::Int
     n_ypixels::Int
 end
 
 function MCPPixelMap(n_xpixels::Int, n_ypixels::Int)::MCPPixelMap
     data = [Vector{Tuple{Int,Float64}}() for _ = 1:n_xpixels, _ = 1:n_ypixels]
-    MCPPixelMap(data, n_xpixels, n_ypixels)
+    occupied = sizehint!(Tuple{Int,Int}[], 64)
+    MCPPixelMap(data, occupied, n_xpixels, n_ypixels)
 end
 
 """
@@ -106,9 +108,10 @@ It iterates through all pixels and empties their hit lists, leaving the pixel ma
 - `Nothing`: The function modifies the input pixel map in place.
 """
 function _reset_pixelmap!(pixelmap::MCPPixelMap)
-    @inbounds for hits in pixelmap.data
-        empty!(hits)
+    @inbounds for (x, y) in pixelmap.occupied
+        empty!(pixelmap.data[x + 1, y + 1])
     end
+    empty!(pixelmap.occupied)
     return nothing
 end
 
@@ -134,20 +137,16 @@ Each returned `PixelHit` includes global coordinates and associated charge infor
 # Returns
 - `Union{Nothing,Vector{PixelHit}}`: A collection of pixel hits or `nothing` if no hits are found.
 """
-function _get_hits(
+function _append_pixel_hits!(
+    hitcollection::Vector{PixelHit},
     pixelmap::MCPPixelMap,
     mcp::Int,
     n_deadtime::Int,
     xpixel::Int,
     ypixel::Int,
-)::Union{Nothing,Vector{PixelHit}}
-
-    if !_is_occupied(pixelmap, xpixel, ypixel)
-        return nothing
-    end
-
+)
     hits = @inbounds pixelmap.data[xpixel + 1, ypixel + 1]
-    hitcollection = Vector{PixelHit}()
+    isempty(hits) && return nothing
 
     offset = mcp * pixelmap.n_xpixels
 
@@ -155,7 +154,7 @@ function _get_hits(
     sort!(hits, by = first, rev = false)
 
     # If the first hit's t value is > 0, add it to the collection
-    if hits[1][1] > 0
+    @inbounds if hits[1][1] > 0
         push!(
             hitcollection,
             PixelHit(xpixel + offset, ypixel, hits[1][1], hits[1][2]),
@@ -173,7 +172,24 @@ function _get_hits(
             )
         end
     end
-    return hitcollection
+    return nothing
+end
+
+function _get_hits(
+    pixelmap::MCPPixelMap,
+    mcp::Int,
+    n_deadtime::Int,
+    xpixel::Int,
+    ypixel::Int,
+)::Union{Nothing,Vector{PixelHit}}
+
+    if !_is_occupied(pixelmap, xpixel, ypixel)
+        return nothing
+    end
+
+    hitcollection = Vector{PixelHit}()
+    _append_pixel_hits!(hitcollection, pixelmap, mcp, n_deadtime, xpixel, ypixel)
+    return isempty(hitcollection) ? nothing : hitcollection
 end
 
 function _get_hits(
@@ -182,17 +198,9 @@ function _get_hits(
     n_deadtime::Int,
 )::Union{Nothing,Vector{PixelHit}}
 
-    hitcollection = Vector{PixelHit}(undef, 0)
-
-    for y = 0:pixelmap.n_ypixels-1
-        for x = 0:pixelmap.n_xpixels-1
-            if _is_occupied(pixelmap, x, y)
-                pixelhits = _get_hits(pixelmap, mcp, n_deadtime, x, y)
-                if pixelhits !== nothing
-                    append!(hitcollection, pixelhits)
-                end
-            end
-        end
+    hitcollection = Vector{PixelHit}()
+    for (x, y) in pixelmap.occupied
+        _append_pixel_hits!(hitcollection, pixelmap, mcp, n_deadtime, x, y)
     end
 
     return isempty(hitcollection) ? nothing : hitcollection
@@ -205,16 +213,13 @@ function _get_hits(
     xpixel::Int,
 )::Union{Nothing,Vector{PixelHit}}
 
-    hitcollection = Vector{PixelHit}(undef, 0)
     if xpixel < 0 || xpixel >= pixelmap.n_xpixels
         return nothing
     end
-    for y = 0:pixelmap.n_ypixels-1
-        if _is_occupied(pixelmap, xpixel, y)
-            pixelhits = _get_hits(pixelmap, mcp, n_deadtime, xpixel, y)
-            if pixelhits !== nothing
-                append!(hitcollection, pixelhits)
-            end
+    hitcollection = Vector{PixelHit}()
+    for (x, y) in pixelmap.occupied
+        if x == xpixel
+            _append_pixel_hits!(hitcollection, pixelmap, mcp, n_deadtime, x, y)
         end
     end
     return isempty(hitcollection) ? nothing : hitcollection
@@ -234,8 +239,8 @@ Each entry in a pixel's hit list represents a single hit.
 """
 function _get_number_hits(pixelmap::MCPPixelMap)::Int
     total_hits = 0
-    @inbounds for hits in pixelmap.data
-        total_hits += length(hits)
+    @inbounds for (x, y) in pixelmap.occupied
+        total_hits += length(pixelmap.data[x + 1, y + 1])
     end
     return total_hits
 end
@@ -278,7 +283,11 @@ function _fill_pixelmap!(
        (ypixel >= mcpimage.pixelmap.n_ypixels)
         return
     end
-    @inbounds push!(mcpimage.pixelmap.data[xpixel + 1, ypixel + 1], (tpixel, charge))
+    hits = @inbounds mcpimage.pixelmap.data[xpixel + 1, ypixel + 1]
+    if isempty(hits)
+        push!(mcpimage.pixelmap.occupied, (xpixel, ypixel))
+    end
+    push!(hits, (tpixel, charge))
     return
 end
 
@@ -568,6 +577,59 @@ Otherwise, it directly updates the pixel map of the corresponding MCP image.
 # Returns
 Nothing.
 """
+function _add_with_sharing!(
+    mcps::MCPImageArray,
+    fe::FrontEnd,
+    cdt::ChargeDepositTester,
+    xpos::Float64,
+    ypos::Float64,
+    time::Float64,
+)
+    mcp = get_mcp_number(xpos)
+    xcentre = get_mcp_xpixel(xpos)
+    ycentre = get_ypixel(ypos)
+    if (mcp < 0) ||
+       (mcp >= fe.n_mcps) ||
+       (xcentre < 0) ||
+       (xcentre >= fe.n_xpixels) ||
+       (ycentre < 0) ||
+       (ycentre >= fe.n_ypixels)
+        return
+    end
+
+    mcpimg = @inbounds mcps[mcp + 1]
+    xval = get_mcp_xposition(xpos)
+    nx = cdt.n_xbins
+    ny = cdt.n_ybins
+
+    ix_low = max(xcentre - nx, 0)
+    ix_upp = min(xcentre + nx, fe.n_xpixels - 1)
+    iy_low = max(ycentre - ny, 0)
+    iy_upp = min(ycentre + ny, fe.n_ypixels - 1)
+
+    active = fe.active
+    x_size = fe.x_size
+    y_size = fe.y_size
+    do_smear_time = fe.smear_time
+
+    @inbounds for ix = ix_low:ix_upp
+        for iy = iy_low:iy_upp
+            xlow = ix * x_size - 0.5 * active
+            ylow = iy * y_size - 0.5 * active
+            xupp = xlow + x_size
+            yupp = ylow + y_size
+
+            if charge_over_threshold(cdt, xval, xlow, xupp, ypos, ylow, yupp)
+                tprime = do_smear_time ? smear_time(cdt, time) : time
+                tpixel = get_tpixel_nocheck(tprime)
+                charge = get_charge(cdt, xval, xlow, xupp, ypos, ylow, yupp)
+                _fill_pixelmap!(mcpimg, ix, iy, tpixel; charge = charge)
+            end
+        end
+    end
+    return
+end
+
 function add_photon!(
     mcps::MCPImageArray,
     fe::FrontEnd,
@@ -577,20 +639,7 @@ function add_photon!(
     time::Float64,
 )
     if fe.sharing_mode
-        mcp = get_mcp_number(xpos)
-
-        if (mcp < 0) || mcp >= fe.n_mcps
-            return
-        end
-
-        # Only look up pixels if mcp is valid
-        pixels = find_pixels(fe, cdt, xpos, ypos, time)
-        if pixels !== nothing
-            mcpimg = mcps[mcp+1] # should it be mcp+1 the index?
-            for pixel in pixels
-                _fill_pixelmap!(mcpimg, pixel)
-            end
-        end
+        _add_with_sharing!(mcps, fe, cdt, xpos, ypos, time)
     else
         add_without_sharing!(mcps, fe, cdt, xpos, ypos, time)
     end
@@ -625,27 +674,31 @@ function reset!(mcps::MCPImageArray, fe::FrontEnd)
 end
 
 """
+    get_hits!(hitcollection::Vector{PixelHit}, mcps::MCPImageArray, fe::FrontEnd)::Vector{PixelHit}
     get_hits(mcps::MCPImageArray, fe::FrontEnd)
 
-`get_hits` retrieves all hits from the MCP image array by iterating through each MCP image and collecting hits from all pixels.  
-If no hits are found, it returns `nothing`. This function aggregates hits from all MCPs in the detector.
-
-# Arguments
-- `mcps::MCPImageArray`: Array of MCP image objects to get hits from.
-- `fe::FrontEnd`: Front-end electronics configuration.
-
-# Returns
-- `Union{Nothing,Vector{PixelHit}}`: Collection of all hits or nothing if no hits are found.
+`get_hits` retrieves all hits from the MCP image array by iterating through each MCP image and collecting hits from occupied pixels.  
+If no hits are found, `get_hits` returns `nothing` (`get_hits!` returns an empty `hitcollection`).
 """
-function get_hits(mcps::MCPImageArray, fe::FrontEnd)::Union{Nothing,Vector{PixelHit}}
-    hitcollection = Vector{PixelHit}()
+function get_hits!(
+    hitcollection::Vector{PixelHit},
+    mcps::MCPImageArray,
+    fe::FrontEnd,
+)::Vector{PixelHit}
+    empty!(hitcollection)
     for i = 1:fe.n_mcps
         pixelmap = mcps[i].pixelmap
         n_deadtime = mcps[i].n_deadtime
-        pixelhits = _get_hits(pixelmap, i - 1, n_deadtime)
-        if pixelhits !== nothing
-            append!(hitcollection, pixelhits)
+        mcp = i - 1
+        for (x, y) in pixelmap.occupied
+            _append_pixel_hits!(hitcollection, pixelmap, mcp, n_deadtime, x, y)
         end
     end
+    return hitcollection
+end
+
+function get_hits(mcps::MCPImageArray, fe::FrontEnd)::Union{Nothing,Vector{PixelHit}}
+    hitcollection = Vector{PixelHit}()
+    get_hits!(hitcollection, mcps, fe)
     return isempty(hitcollection) ? nothing : hitcollection
 end

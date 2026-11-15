@@ -19,7 +19,8 @@
 # Returns
 - `Vector{HitCoordinate}`: A vector of hit coordinates compatible with the provided spectrum and particle parameters.
 """
-function project_pattern(
+function project_pattern!(
+    hits::Vector{HitCoordinate},
     particle::Particle,
     beta::Float64,
     mapper::PhotonMapper,
@@ -27,7 +28,7 @@ function project_pattern(
     distribution::PhotonSpectrumDistribution,
     context::PhotonContext,
 )::Vector{HitCoordinate}
-    hits = HitCoordinate[]
+    empty!(hits)
 
     if !spectrum_above_threshold(distribution)
         return hits
@@ -58,6 +59,18 @@ function project_pattern(
         push!(hits, hit)
     end
     return hits
+end
+
+function project_pattern(
+    particle::Particle,
+    beta::Float64,
+    mapper::PhotonMapper,
+    spectrum::PhotonSpectrum,
+    distribution::PhotonSpectrumDistribution,
+    context::PhotonContext,
+)::Vector{HitCoordinate}
+    hits = HitCoordinate[]
+    return project_pattern!(hits, particle, beta, mapper, spectrum, distribution, context)
 end
 
 function project_pattern(

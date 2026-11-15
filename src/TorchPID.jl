@@ -13,7 +13,7 @@ export Focus, Detector, Mask, Signal
 export GEOMETRY, RADIATOR, WEDGE, FOCUS, DETECTOR, MASK, SIGNAL
 export HitCoordinate, PixelHit
 export DetectorHitTester, photon_efficiency, test_photon
-export PhotonSpectrum, PhotonSpectrumDistribution
+export PhotonSpectrum, PhotonSpectrumDistribution, update_distribution!
 export spectrum_nphase, spectrum_ngroup
 export spectrum_yield,
     spectrum_random_energy,
@@ -35,12 +35,17 @@ export PhotonMapper, trace_photon
 export ChargeDepositTester,
     charge_over_threshold, get_charge, get_smeared_time, smear_time, cached_time_weights
 export TorchImage, TorchImageAccumulator, fill!, reset!
-export project_pattern, make_pattern
+export project_pattern, project_pattern!, make_pattern
 export get_xpixel_position,
     get_ypixel_position, get_tpixel_position, get_hit_coordinate, is_in_pixel
-export FrontEnd, create_mcp_images, add_photon!, reset!, get_hits
+export FrontEnd, create_mcp_images, add_photon!, reset!, get_hits, get_hits!
 export TestBeamSimulator,
-    TestBeamParticle, TestBeamPhotons, generate_particles, generate_photons_batch
+    TestBeamParticle,
+    TestBeamPhotons,
+    TestBeamWorkspace,
+    generate_particles,
+    generate_photons,
+    generate_photons_batch
 export AbstractBackgroundModel, FlatBackground, get_bkg_probability, fill_bkg_probabilities!
 export ReverseMappingConfig,
     MappedPhoton,

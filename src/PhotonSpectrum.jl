@@ -178,26 +178,36 @@ struct PhotonSpectrumDistribution
     cumulative::Vector{Float64}
 end
 
+function update_distribution!(
+    distribution::Vector{Float64},
+    cumulative::Vector{Float64},
+    s::PhotonSpectrum,
+    beta::Float64,
+)::PhotonSpectrumDistribution
+    nbins = s.nbins
+    dE = s.dE
+    csum = 0.0
+    @inbounds for i = 1:nbins
+        bn = beta * s.nphase[i]
+        sinsqthetac = bn > 1.0 ? 1.0 - (1.0 / bn)^2 : 0.0
+        val = 37.0 * dE * sinsqthetac * s.efficiency[i]
+        distribution[i] = val
+        csum += val
+        cumulative[i] = csum
+    end
+    if csum > 0.0
+        inv_csum = 1.0 / csum
+        @inbounds for i = 1:nbins
+            cumulative[i] *= inv_csum
+        end
+    end
+    return PhotonSpectrumDistribution(beta, csum, distribution, cumulative)
+end
+
 function PhotonSpectrumDistribution(s::PhotonSpectrum, beta::Float64)
-    #distribution = Vector{Float64}(undef, s.nbins)
+    distribution = Vector{Float64}(undef, s.nbins)
     cumulative = Vector{Float64}(undef, s.nbins)
-
-    distribution = map(
-        (v1, v2) -> begin
-            bn = beta * v1
-            sinsqthetac = bn > 1.0 ? 1.0 - (1.0 / bn)^2 : 0.0
-            37.0 * s.dE * sinsqthetac * v2
-        end,
-        s.nphase,
-        s.efficiency,
-    )
-
-    cumsum!(cumulative, distribution)
-
-    yield_per_mm = cumulative[end]
-    cumulative ./= yield_per_mm
-
-    PhotonSpectrumDistribution(beta, yield_per_mm, distribution, cumulative)
+    return update_distribution!(distribution, cumulative, s, beta)
 end
 
 """ 

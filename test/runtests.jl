@@ -195,9 +195,9 @@ using TorchPID
         fe = FrontEnd(DETECTOR)
         cdt = ChargeDepositTester()
 
-        particles = generate_particles(tb, RADIATOR, CONSTANTS, 5)
+        particles = generate_particles(tb, RADIATOR, CONSTANTS, 5; nthreads = 1)
         @test length(particles) == 5
-        batches = generate_photons_batch(particles, s, mapper, ctx, fe, cdt)
+        batches = generate_photons_batch(particles, s, mapper, ctx, fe, cdt; nthreads = 1)
         @test length(batches) == 5
         for b in batches
             if b !== nothing
@@ -207,6 +207,19 @@ using TorchPID
                 @test all(t -> 0.0 <= t < DETECTOR.n_tpixels, b.tpixels)
             end
         end
+
+        particles_mt = generate_particles(tb, RADIATOR, CONSTANTS, 20; nthreads = 4)
+        @test length(particles_mt) == 20
+        batches_mt = generate_photons_batch(particles_mt, s, mapper, ctx, fe, cdt; nthreads = 4)
+        @test length(batches_mt) == 20
+        @test any(b -> b !== nothing && b.npixels > 0, batches_mt)
+
+        ws = TestBeamWorkspace(s, fe)
+        update_distribution!(ws.dist_buf, ws.cum_buf, s, particles[1].beta)
+        @test (@allocated update_distribution!(ws.dist_buf, ws.cum_buf, s, particles[1].beta)) == 0
+        add_photon!(ws.mcp_images, fe, cdt, 0.0, 0.0, 25.0)
+        get_hits!(ws.pixels_buf, ws.mcp_images, fe)
+        @test (@allocated get_hits!(ws.pixels_buf, ws.mcp_images, fe)) == 0
     end
 
     @testset "11. PIDAlgorithm Photon Selection & Coordinates" begin

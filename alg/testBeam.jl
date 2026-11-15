@@ -75,6 +75,7 @@ end
 function main()
     args = parse_commandline()
     events = args["events"]
+    nthreads = args["threads"]
     plot_interval = args["plot-interval"]
     batch_size = 1000  # Choose a reasonable batch size
 
@@ -98,7 +99,8 @@ function main()
             tb_simulator,
             photon_context.radiator,
             photon_context.constants,
-            this_batch,
+            this_batch;
+            nthreads = nthreads,
         )
         tb_photons = generate_photons_batch(
             tb_particles,
@@ -106,7 +108,8 @@ function main()
             photon_mapper,
             photon_context,
             frontend,
-            charge_tester,
+            charge_tester;
+            nthreads = nthreads,
         )
 
         for i in 1:this_batch
