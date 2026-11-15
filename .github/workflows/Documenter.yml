@@ -6,14 +6,14 @@ on:
       - main
     paths:
       - 'docs/**'
-      # - 'src/**/*.jl'
-      # - '.github/workflows/Documenter.yml'
+      - 'src/**/*.jl'
+      - '.github/workflows/Documenter.yml'
     tags: '*'
   pull_request:
     paths:
       - 'docs/**'
-      # - 'src/**/*.jl'
-      # - '.github/workflows/Documenter.yml'
+      - 'src/**/*.jl'
+      - '.github/workflows/Documenter.yml'
 
 jobs:
   build:
@@ -34,7 +34,7 @@ jobs:
           julia --project=. -e '
             using Pkg
             Pkg.instantiate()
-            Pkg.build("TorchPID")
+            Pkg.build()
             Pkg.precompile()'
             
       - name: Install dependencies
