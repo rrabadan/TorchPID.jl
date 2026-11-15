@@ -11,6 +11,10 @@ makedocs(
         "Home" => "index.md",
         "TORCH Detector" => "torch.md",
         "Guide" => "guide.md",
+        "Components" => [
+            "Cherenkov Spectra" => "components/photonspectra.md",
+            "Unbinned PID Algorithm" => "components/unbinned_pid.md",
+        ],
         "API" => [
             "Overview" => "api/api.md",
             "Physics Constants" => "api/physics_constants.md",
@@ -18,7 +22,8 @@ makedocs(
             "Photon" => "api/photon.md",
             "Photon Mapper" => "api/photonmapper.md",
             "Photon Spectrum" => "api/photonspectrum.md",
-            "Patter Matcher" => "api/pattern_matcher.md",
+            "Pattern Matcher" => "api/pattern_matcher.md",
+            "Unbinned PID" => "api/unbinned_pid.md",
         ],
     ],
     checkdocs=:none,
@@ -40,6 +45,10 @@ makedocs(
         "Home" => "index.md",
         "TORCH Detector" => "torch.md",
         "Guide" => "guide.md",
+        "Components" => [
+            "Cherenkov Spectra" => "components/photonspectra.md",
+            "Unbinned PID Algorithm" => "components/unbinned_pid.md",
+        ],
         "API" => [
             "Overview" => "api/api.md",
             "Physics Constants" => "api/physics_constants.md",
@@ -48,6 +57,7 @@ makedocs(
             "Photon Mapper" => "api/photonmapper.md",
             "Photon Spectrum" => "api/photonspectrum.md",
             "Pattern Matcher" => "api/pattern_matcher.md",
+            "Unbinned PID" => "api/unbinned_pid.md",
         ],
     ],
     checkdocs=:none,

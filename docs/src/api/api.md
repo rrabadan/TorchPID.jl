@@ -13,3 +13,5 @@ Documentation for "TorchPID.jl" interface.
 - [Photon Mapper](photonmapper.md): Tools for simulating the photon propagation through TORCH's optical system.
 
 - [Photon Spectrum](photonspectrum.md): Tools to model the Cherenkov radiation photon spectra within the TORCH detector
+
+- [Unbinned PID & Reverse Mapping](unbinned_pid.md): Analytical reverse-mapping reconstruction, signal PDF, coordinate Jacobian, and extended multi-track likelihood solver.

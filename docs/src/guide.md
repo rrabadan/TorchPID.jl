@@ -12,6 +12,7 @@ This guide provides comprehensive information to help you get started with Torch
 TorchPID.jl is organized in components providing the following functionality:
 
 - [Cherenkov Radiation Spectra in the TORCH Detector](components/photonspectra.md)
+- [Unbinned PID Algorithm & Reverse Mapping](components/unbinned_pid.md)
 - Reconstructing photon paths
 - Applying particle identification algorithms
 - Reading LHCb TORCH input data
